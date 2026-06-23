@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="A cache-optimized C++20 limit order book and matching engine. 48ns p50 submit, 78ns p50 match on bare metal. O(1) price lookup, zero allocation, single-threaded core, rdtscp timing. Interactive dashboard and 173 passing tests.">
+<title>LOB Matching Engine — C++20 Low-Latency Order Book</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='80'>⚡</text></svg>">
+<link rel="prefetch" href="report.html" as="document">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --glass:rgba(255,255,255,.06);
+  --glass-border:rgba(255,255,255,.1);
+  --glass-hover:rgba(255,255,255,.12);
+  --text:#f0f6fc;
+  --dim:#8b949e;
+  --green:#3fb950;
+  --red:#f85149;
+  --blue:#58a6ff;
+  --purple:#bc8cff;
+  --yellow:#d29922;
+  --cyan:#56d4dd;
+  --card2:rgba(255,255,255,.04);
+}
+html{scroll-behavior:smooth}
+body{
+  min-height:100vh;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Inter',sans-serif;
+  color:var(--text);
+  overflow-x:hidden;
+  background:#07090f;
+}
+
+/* ── animated gradient background ── */
+.bg{
+  position:fixed;inset:0;z-index:-2;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 30%, rgba(88,166,255,.12) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 50% at 80% 70%, rgba(188,140,255,.10) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 40% at 50% 90%, rgba(63,185,80,.06) 0%, transparent 70%),
+    #07090f;
+}
+.bg-grid{
+  position:fixed;inset:0;z-index:-1;
+  background-image:
+    linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
+  background-size:60px 60px;
+  mask-image:radial-gradient(ellipse 70% 60% at 50% 40%, black 20%, transparent 100%);
+  -webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 40%, black 20%, transparent 100%);
+}
+
+/* ── floating orbs ── */
+.orb{position:fixed;border-radius:50%;filter:blur(100px);opacity:.35;z-index:-1;pointer-events:none}
+.orb-1{width:500px;height:500px;background:#58a6ff;top:-10%;left:-5%;animation:drift1 20s ease-in-out infinite}
+.orb-2{width:400px;height:400px;background:#bc8cff;bottom:-5%;right:-5%;animation:drift2 25s ease-in-out infinite}
+.orb-3{width:300px;height:300px;background:#3fb950;top:50%;left:60%;animation:drift3 18s ease-in-out infinite}
+@keyframes drift1{0%,100%{transform:translate(0,0)}50%{transform:translate(60px,40px)}}
+@keyframes drift2{0%,100%{transform:translate(0,0)}50%{transform:translate(-50px,-30px)}}
+@keyframes drift3{0%,100%{transform:translate(0,0)}50%{transform:translate(-40px,50px)}}
+
+/* ── glass card ── */
+.glass{
+  background:var(--glass);
+  backdrop-filter:blur(20px) saturate(1.4);
+  -webkit-backdrop-filter:blur(20px) saturate(1.4);
+  border:1px solid var(--glass-border);
+  border-radius:16px;
+  transition:all .3s ease;
+}
+.glass:hover{
+  background:var(--glass-hover);
+  border-color:rgba(255,255,255,.18);
+  transform:translateY(-4px);
+  box-shadow:0 20px 60px rgba(0,0,0,.3),0 0 40px rgba(88,166,255,.06);
+}
+
+/* ── layout ── */
+.wrap{max-width:1200px;margin:0 auto;padding:0 24px}
+
+/* ── hero ── */
+.hero{
+  text-align:center;
+  padding:100px 24px 60px;
+  position:relative;
+}
+.hero-badge{
+  display:inline-block;
+  padding:5px 16px;
+  border-radius:20px;
+  background:rgba(88,166,255,.1);
+  border:1px solid rgba(88,166,255,.25);
+  color:var(--blue);
+  font-size:12px;
+  font-weight:600;
+  letter-spacing:.5px;
+  text-transform:uppercase;
+  margin-bottom:24px;
+}
+.hero h1{
+  font-size:clamp(42px,7vw,72px);
+  font-weight:800;
+  line-height:1.15;
+  letter-spacing:-.03em;
+  margin-bottom:16px;
+  padding-bottom:4px;
+  background:linear-gradient(135deg,#f0f6fc 0%,#58a6ff 50%,#bc8cff 100%);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.hero p{
+  font-size:18px;
+  color:var(--dim);
+  max-width:600px;
+  margin:0 auto 36px;
+  line-height:1.6;
+}
+.hero-stats{
+  display:flex;
+  justify-content:center;
+  gap:40px;
+  flex-wrap:wrap;
+  margin-bottom:40px;
+}
+.hero-stat{text-align:center}
+.hero-stat .n{font-size:28px;font-weight:700;font-family:'SF Mono',Consolas,monospace}
+.hero-stat .l{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+
+.hero-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.btn{
+  padding:12px 28px;
+  border-radius:10px;
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+  transition:all .2s;
+  text-decoration:none;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+}
+.btn-primary{
+  background:linear-gradient(135deg,#58a6ff,#bc8cff);
+  border:none;
+  color:#fff;
+}
+.btn-primary:hover{opacity:.9;transform:translateY(-2px);box-shadow:0 8px 30px rgba(88,166,255,.3)}
+.btn-ghost{
+  background:transparent;
+  border:1px solid var(--glass-border);
+  color:var(--text);
+}
+.btn-ghost:hover{border-color:rgba(255,255,255,.25);background:var(--glass)}
+
+/* ── sections ── */
+.section{padding:60px 0}
+.section-title{
+  font-size:13px;
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  color:var(--blue);
+  margin-bottom:8px;
+}
+.section-heading{
+  font-size:clamp(24px,4vw,36px);
+  font-weight:700;
+  letter-spacing:-.02em;
+  margin-bottom:40px;
+}
+
+/* ── web tools grid ── */
+.tools-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+  gap:16px;
+}
+.tool-card{
+  padding:24px;
+  cursor:pointer;
+  text-decoration:none;
+  color:inherit;
+  display:block;
+  position:relative;
+  overflow:hidden;
+}
+.tool-card::before{
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;
+  height:3px;
+  border-radius:16px 16px 0 0;
+  opacity:0;
+  transition:opacity .3s;
+}
+.tool-card:hover::before{opacity:1}
+.tool-card:nth-child(1)::before{background:var(--green)}
+.tool-card:nth-child(2)::before{background:var(--purple)}
+.tool-card:nth-child(3)::before{background:var(--red)}
+.tool-card:nth-child(4)::before{background:var(--blue)}
+.tool-card:nth-child(5)::before{background:var(--yellow)}
+.tool-card:nth-child(6)::before{background:var(--cyan)}
+.tool-card:nth-child(7)::before{background:var(--yellow)}
+.tool-card:nth-child(8)::before{background:var(--red)}
+.tool-card:nth-child(9)::before{background:var(--green)}
+.tool-card:nth-child(10)::before{background:var(--purple)}
+.tool-card:nth-child(11)::before{background:var(--cyan)}
+.tool-card:nth-child(12)::before{background:var(--green)}
+.tool-card:nth-child(13)::before{background:var(--yellow)}
+
+.tool-icon{
+  width:40px;height:40px;
+  border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;
+  margin-bottom:14px;
+}
+.tool-card h3{font-size:16px;font-weight:600;margin-bottom:6px}
+.tool-card p{font-size:13px;color:var(--dim);line-height:1.5}
+.tool-tag{
+  display:inline-block;
+  padding:2px 8px;
+  border-radius:4px;
+  font-size:10px;
+  font-weight:600;
+  margin-top:10px;
+  text-transform:uppercase;
+  letter-spacing:.3px;
+}
+
+/* ── CLI tools ── */
+.cli-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+  gap:16px;
+}
+.cli-card{padding:24px;position:relative}
+.cli-cmd{
+  font-family:'SF Mono',Consolas,monospace;
+  font-size:13px;
+  color:var(--green);
+  background:rgba(63,185,80,.08);
+  padding:6px 12px;
+  border-radius:6px;
+  display:inline-block;
+  margin-bottom:12px;
+}
+.cli-card h3{font-size:15px;font-weight:600;margin-bottom:6px}
+.cli-card p{font-size:13px;color:var(--dim);line-height:1.5}
+
+/* ── architecture ── */
+.arch-row{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:0;
+  flex-wrap:wrap;
+  padding:30px 0;
+}
+.arch-node{
+  padding:14px 24px;
+  text-align:center;
+  min-width:120px;
+}
+.arch-node .name{font-size:13px;font-weight:600}
+.arch-node .sub{font-size:10px;color:var(--dim);margin-top:2px}
+.arch-arrow{
+  color:var(--dim);
+  font-size:22px;
+  padding:0 4px;
+  font-family:'SF Mono',Consolas,monospace;
+}
+
+/* ── tech stack ── */
+.stack-grid{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  justify-content:center;
+}
+.stack-tag{
+  padding:8px 18px;
+  border-radius:8px;
+  font-size:13px;
+  font-weight:500;
+  cursor:help;
+}
+.stack-tag.tip-wrap .tip{
+  bottom:auto;
+  top:calc(100% + 10px);
+}
+
+/* ── footer ── */
+footer{
+  text-align:center;
+  padding:40px 24px;
+  color:var(--dim);
+  font-size:12px;
+  border-top:1px solid rgba(255,255,255,.06);
+}
+footer a{color:var(--blue);text-decoration:none}
+footer a:hover{text-decoration:underline}
+
+/* ── tooltips ── */
+.tip-wrap{position:relative;cursor:help}
+.tip-wrap .tip{
+  display:none;
+  position:absolute;
+  bottom:calc(100% + 10px);
+  left:50%;
+  transform:translateX(-50%);
+  background:#161b22;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:10px;
+  padding:12px 14px;
+  width:260px;
+  font-size:12px;
+  line-height:1.5;
+  color:var(--text);
+  z-index:100;
+  box-shadow:0 8px 30px rgba(0,0,0,.7);
+  pointer-events:none;
+  text-align:left;
+}
+.tip-wrap:hover .tip{display:block}
+.tip b{color:var(--blue);display:block;margin-bottom:4px;font-size:13px}
+.tip .dim{color:var(--dim);font-size:11px;margin-top:4px}
+/* hero stat tooltips appear below */
+.hero-stat.tip-wrap .tip{
+  bottom:auto;
+  top:calc(100% + 10px);
+  width:280px;
+}
+
+details[open] .details-arrow{transform:rotate(180deg)}
+details summary::-webkit-details-marker{display:none}
+
+/* ── terminal preview ── */
+.cli-preview{
+  margin-top:12px;
+  background:rgba(0,0,0,.4);
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:8px;
+  padding:10px 12px;
+  font-family:'SF Mono',Consolas,monospace;
+  font-size:10px;
+  line-height:1.6;
+  color:var(--dim);
+  white-space:pre-wrap;
+  word-break:break-all;
+}
+.cli-preview .g{color:var(--green)}
+.cli-preview .y{color:var(--yellow)}
+.cli-preview .b{color:var(--blue)}
+.cli-preview .r{color:var(--red)}
+.cli-preview .w{color:var(--text)}
+.cli-preview .p{color:var(--purple)}
+
+/* ── cursor glow ── */
+.cursor-glow{
+  position:fixed;
+  width:400px;height:400px;
+  border-radius:50%;
+  pointer-events:none;
+  background:radial-gradient(circle,rgba(88,166,255,.08) 0%,transparent 70%);
+  transform:translate(-50%,-50%);
+  z-index:0;
+  transition:opacity .3s;
+}
+
+@media(max-width:700px){
+  .hero{padding:60px 16px 40px}
+  .hero-stats{gap:24px}
+  .tools-grid,.cli-grid{grid-template-columns:1fr}
+  .arch-row{flex-direction:column}
+  .arch-arrow{transform:rotate(90deg)}
+  .cursor-glow{display:none}
+}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="bg-grid"></div>
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+<div class="cursor-glow" id="cursorGlow"></div>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero">
+  <div class="hero-badge">C++20 &middot; Zero-Allocation &middot; Single-Threaded Core</div>
+  <h1>LOB Matching<br>Engine</h1>
+  <p>A cache-optimized limit order book with O(1) submit, cancel, and modify. 48ns p50 submit latency on bare metal. Zero allocation, single-threaded core.</p>
+  <div class="hero-stats">
+    <div class="hero-stat tip-wrap"><div class="n" style="color:var(--green)">O(1)</div><div class="l">Price Lookup</div><div class="tip"><b>O(1) Price Lookup</b>Price levels are stored in a direct-indexed array keyed by tick index. Looking up any price is a single array access &mdash; no tree traversal, no hash computation. This gives constant-time submit, cancel, and BBO queries regardless of how many levels are active.</div></div>
+    <a href="report.html#learn" onclick="sessionStorage.setItem('lob_tab','learn');sessionStorage.setItem('lob_learn_view','tool')" class="hero-stat tip-wrap" style="text-decoration:none;color:inherit;cursor:pointer"><div class="n" style="color:var(--blue)">173</div><div class="l">Tests Passing</div><div class="tip"><b>173 Tests Across 4 Binaries</b>Typed GoogleTest cases run against all three book implementations (OrderBook, PhotonBook, RefOrderBook). A fuzz cross-checker runs 1M+ random operations comparing every observable output against a reference model. Click to see the full test breakdown.</div></a>
+    <div class="hero-stat tip-wrap"><div class="n" style="color:var(--purple)">0</div><div class="l">Hot-Path Allocs</div><div class="tip"><b>Zero Hot-Path Allocations</b>All order slots are pre-allocated in a pool at startup. The intrusive free list hands out and reclaims slots in O(1) with no syscalls. malloc/new never runs during matching &mdash; eliminating the kernel page-fault and lock contention that cause tail-latency spikes.</div></div>
+    <div class="hero-stat tip-wrap"><div class="n" style="color:var(--yellow)">rdtscp</div><div class="l">Cycle Timing</div><div class="tip"><b>rdtscp Cycle-Accurate Timing</b>Reads the CPU timestamp counter directly (~0.3ns resolution) instead of std::chrono which can alias to system_clock or call into the kernel. Also returns the core ID so cross-core migration samples are detected and discarded. Calibrated against steady_clock at startup.</div></div>
+  </div>
+  <div class="hero-actions">
+    <a href="report.html" class="btn btn-primary">Launch Dashboard</a>
+    <a href="https://github.com/JadenBresciaVillanova/cpp-matching-engine" class="btn btn-ghost">View Source</a>
+  </div>
+</section>
+
+<!-- ═══ WHAT THIS IS ═══ -->
+<section class="section" style="padding-bottom:0">
+  <div class="wrap">
+    <details class="glass" style="padding:24px;cursor:default">
+      <summary style="cursor:pointer;display:flex;align-items:center;gap:10px;list-style:none">
+        <span style="font-size:22px;font-weight:700;letter-spacing:-.01em;flex:1">What This Is &mdash; Start Here</span>
+        <span style="color:var(--dim);font-size:12px">click to expand</span>
+        <span style="color:var(--dim);font-size:16px;transition:transform .2s" class="details-arrow">&#9662;</span>
+      </summary>
+      <div style="margin-top:20px">
+
+        <!-- ── THE PROBLEM ── -->
+        <div style="margin-bottom:20px">
+          <h3 style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:10px">The Problem: How Do Stock Exchanges Actually Work?</h3>
+          <p style="color:var(--dim);font-size:13px;line-height:1.85;margin:0 0 12px">When you buy a share of Apple on your phone, your order doesn&rsquo;t magically find a seller. It travels to a <b style="color:var(--text)">stock exchange</b> (like NYSE or NASDAQ), where a piece of software called a <b style="color:var(--text)">matching engine</b> pairs your buy order with someone else&rsquo;s sell order. This happens for every single trade &mdash; stocks, options, futures, crypto &mdash; billions of times per day, worldwide.</p>
+          <p style="color:var(--dim);font-size:13px;line-height:1.85;margin:0">The matching engine is the most performance-critical software in all of finance. At firms like Citadel Securities, Jane Street, or the NYSE itself, the difference between processing an order in <b style="color:var(--text)">80 nanoseconds vs. 800 nanoseconds</b> is worth millions of dollars per year. That&rsquo;s the domain this project lives in.</p>
+        </div>
+
+        <!-- ── KEY CONCEPTS ── -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:20px">
+          <div style="background:var(--card2);border-radius:10px;padding:14px">
+            <h4 style="font-size:13px;font-weight:600;color:var(--blue);margin-bottom:6px">Limit Order Book (LOB)</h4>
+            <p style="color:var(--dim);font-size:12px;line-height:1.75;margin:0">The data structure at the center of every exchange. It&rsquo;s a sorted list of all outstanding buy orders (<b style="color:var(--green)">bids</b>) and sell orders (<b style="color:var(--red)">asks</b>) for a given stock. Buyers are sorted highest-price-first; sellers are sorted lowest-price-first. The gap between the best bid and best ask is called the <b style="color:var(--text)">spread</b>.</p>
+          </div>
+          <div style="background:var(--card2);border-radius:10px;padding:14px">
+            <h4 style="font-size:13px;font-weight:600;color:var(--blue);margin-bottom:6px">Matching Engine</h4>
+            <p style="color:var(--dim);font-size:12px;line-height:1.75;margin:0">The algorithm that checks incoming orders against the book and decides: does this new order cross with an existing one? If your buy price &ge; someone&rsquo;s sell price, it&rsquo;s a <b style="color:var(--text)">match</b> &mdash; a trade happens. The engine enforces <b style="color:var(--text)">price-time priority</b>: best price wins, and if prices are equal, whoever arrived first gets filled first.</p>
+          </div>
+          <div style="background:var(--card2);border-radius:10px;padding:14px">
+            <h4 style="font-size:13px;font-weight:600;color:var(--blue);margin-bottom:6px">Order Types</h4>
+            <p style="color:var(--dim);font-size:12px;line-height:1.75;margin:0">A <b style="color:var(--text)">limit order</b> says &ldquo;buy 100 shares at $50 or less&rdquo; &mdash; it rests on the book until filled. A <b style="color:var(--text)">market order</b> says &ldquo;buy 100 shares at any price&rdquo; &mdash; it matches immediately. <b style="color:var(--text)">IOC</b> (immediate or cancel) fills what it can and cancels the rest. <b style="color:var(--text)">FOK</b> (fill or kill) is all-or-nothing. These all behave differently inside the engine.</p>
+          </div>
+          <div style="background:var(--card2);border-radius:10px;padding:14px">
+            <h4 style="font-size:13px;font-weight:600;color:var(--blue);margin-bottom:6px">Why Nanoseconds Matter</h4>
+            <p style="color:var(--dim);font-size:12px;line-height:1.75;margin:0">High-frequency trading (HFT) firms send millions of orders per second. If the engine is slow, orders queue up, prices go stale, and firms lose money on every trade. The engineering challenge is making every operation &mdash; add, cancel, match &mdash; happen in <b style="color:var(--text)">under a microsecond</b> (1,000 nanoseconds), consistently, even under load. That&rsquo;s why these engines are written in C++, not Python or Java.</p>
+          </div>
+        </div>
+
+        <!-- ── WHAT THIS PROJECT DOES ── -->
+        <div style="background:rgba(63,185,80,.04);border:1px solid rgba(63,185,80,.15);border-radius:10px;padding:16px;margin-bottom:16px">
+          <h3 style="font-size:14px;font-weight:600;color:var(--green);margin-bottom:10px">What This Project Builds</h3>
+          <p style="color:var(--dim);font-size:12.5px;line-height:1.8;margin:0 0 12px">A production-grade matching engine core in C++20, using the same techniques real exchanges use:</p>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">
+            <div style="color:var(--dim);font-size:12px;line-height:1.8">
+              <div style="margin-bottom:4px"><b style="color:var(--text)">O(1) price lookup</b> &mdash; prices map directly to array indices, so finding a price level is a single memory access (no searching)</div>
+              <div style="margin-bottom:4px"><b style="color:var(--text)">Zero allocation on the hot path</b> &mdash; all memory is pre-allocated at startup; no malloc/new during trading, which eliminates unpredictable pauses</div>
+              <div style="margin-bottom:4px"><b style="color:var(--text)">Intrusive linked lists</b> &mdash; orders at each price level are chained together using pointers embedded in the order itself, so adding/removing is one pointer swap</div>
+            </div>
+            <div style="color:var(--dim);font-size:12px;line-height:1.8">
+              <div style="margin-bottom:4px"><b style="color:var(--text)">Cached best bid/ask</b> &mdash; the engine always knows the top of book instantly, without scanning</div>
+              <div style="margin-bottom:4px"><b style="color:var(--text)">Lock-free message passing</b> &mdash; orders flow in and trades flow out through SPSC ring buffers (no mutexes, no thread contention)</div>
+              <div style="margin-bottom:4px"><b style="color:var(--text)">Cycle-accurate measurement</b> &mdash; latency is measured by reading the CPU&rsquo;s timestamp counter directly (rdtscp), with sub-nanosecond resolution</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── WHAT IT DOESN'T DO ── -->
+        <div style="background:rgba(248,81,73,.04);border:1px solid rgba(248,81,73,.12);border-radius:10px;padding:16px;margin-bottom:16px">
+          <h3 style="font-size:14px;font-weight:600;color:var(--red);margin-bottom:10px">What This Doesn&rsquo;t Do (On Purpose)</h3>
+          <p style="color:var(--dim);font-size:12.5px;line-height:1.8;margin:0 0 10px">A real exchange is much more than a matching engine. This project deliberately focuses on the core and omits the surrounding infrastructure:</p>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;color:var(--dim);font-size:12px;line-height:1.8">
+            <div>
+              <div style="margin-bottom:4px"><b style="color:var(--text)">No network layer</b> &mdash; real exchanges use specialized protocols (FIX, ITCH, OUCH) over kernel-bypass networking. This engine processes orders in-process.</div>
+              <div style="margin-bottom:4px"><b style="color:var(--text)">Single instrument</b> &mdash; NYSE runs thousands of stocks; this runs one. The matching logic is the same; the orchestration is different.</div>
+              <div style="margin-bottom:4px"><b style="color:var(--text)">No crash recovery</b> &mdash; production systems write every order to a log before acknowledging it, so they can rebuild state after a crash.</div>
+            </div>
+            <div>
+              <div style="margin-bottom:4px"><b style="color:var(--text)">No regulation</b> &mdash; real exchanges must timestamp every event to nanosecond precision and report to regulators (SEC, MiFID II). That&rsquo;s compliance engineering, not matching.</div>
+              <div style="margin-bottom:4px"><b style="color:var(--text)">No risk checks</b> &mdash; production engines reject &ldquo;fat finger&rdquo; orders (absurd prices/sizes) before matching. Often done in hardware (FPGA).</div>
+              <div style="margin-bottom:4px">These gaps are <a href="report.html#gap" onclick="sessionStorage.setItem('lob_tab','gap')" style="color:var(--blue)">documented honestly in the Production Gap tab</a> &mdash; the scope is deliberate, not accidental.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── THE POINT ── -->
+        <div style="background:rgba(88,166,255,.05);border:1px solid rgba(88,166,255,.15);border-radius:10px;padding:16px;margin-bottom:8px">
+          <h3 style="font-size:14px;font-weight:600;color:var(--blue);margin-bottom:8px">Why This Matters (The CS Problem)</h3>
+          <p style="color:var(--dim);font-size:13px;line-height:1.75;margin:0">The matching core &mdash; the data structures, the allocation strategy, the priority logic &mdash; is the part that requires <b style="color:var(--text)">computer science</b>. How do you look up a price in O(1)? How do you avoid memory allocation during trading? How do you measure latency without the measurement itself adding latency? These are the problems this project solves. Everything around it (networking, persistence, compliance) is systems integration that varies by exchange and jurisdiction. The interactive dashboard below lets you explore every piece of the engine live &mdash; watch it match orders, compare data structures, and see exactly why each design choice exists.</p>
+        </div>
+
+      </div>
+    </details>
+  </div>
+</section>
+
+<!-- ═══ WEB TOOLS ═══ -->
+<section class="section">
+  <div class="wrap">
+    <div class="section-title">Interactive Tools</div>
+    <div class="section-heading">Explore the Engine</div>
+    <div class="tools-grid">
+
+      <a href="report.html#sim" class="tool-card glass" onclick="navigateTab(event,'sim')">
+        <div class="tool-icon" style="background:rgba(63,185,80,.15);color:var(--green)">&#9654;</div>
+        <h3>Solo Simulator</h3>
+        <p>Run the matching engine in real time with synthetic or live crypto data. Tune speed, aggression, and cancel rates.</p>
+        <span class="tool-tag" style="background:rgba(63,185,80,.12);color:var(--green)">Live</span>
+      </a>
+
+      <a href="report.html#multi" class="tool-card glass" onclick="navigateTab(event,'multi')">
+        <div class="tool-icon" style="background:rgba(188,140,255,.15);color:var(--purple)">&#9776;</div>
+        <h3>Latency Race</h3>
+        <p>Race all four engines on the same workload. Same P&L, different speeds — isolates pure latency differences.</p>
+        <span class="tool-tag" style="background:rgba(188,140,255,.12);color:var(--purple)">Latency</span>
+      </a>
+
+      <a href="report.html#pnlrace" class="tool-card glass" onclick="navigateTab(event,'pnlrace')">
+        <div class="tool-icon" style="background:rgba(248,81,73,.15);color:var(--red)">&#36;</div>
+        <h3>P&L Race</h3>
+        <p>Each model runs independently with its own random stream. Watch P&L diverge across different random paths.</p>
+        <span class="tool-tag" style="background:rgba(248,81,73,.12);color:var(--red)">Trading</span>
+      </a>
+
+      <a href="report.html#perf" class="tool-card glass" onclick="navigateTab(event,'perf')">
+        <div class="tool-icon" style="background:rgba(88,166,255,.15);color:var(--blue)">&#9881;</div>
+        <h3>Performance Review</h3>
+        <p>Latency percentiles, throughput gauges, and operation breakdown across all engine variants.</p>
+        <span class="tool-tag" style="background:rgba(88,166,255,.12);color:var(--blue)">Analytics</span>
+      </a>
+
+      <a href="report.html#ref" class="tool-card glass" onclick="navigateTab(event,'ref')">
+        <div class="tool-icon" style="background:rgba(210,153,34,.15);color:var(--yellow)">&#60;/&#62;</div>
+        <h3>C++ Reference</h3>
+        <p>Annotated source walkthroughs of pool allocator, SPSC queue, intrusive lists, and matching logic.</p>
+        <span class="tool-tag" style="background:rgba(210,153,34,.12);color:var(--yellow)">Code</span>
+      </a>
+
+      <a href="report.html#explore" class="tool-card glass" onclick="navigateTab(event,'explore')">
+        <div class="tool-icon" style="background:rgba(86,212,221,.15);color:var(--cyan)">&#128202;</div>
+        <h3>Data Replayer</h3>
+        <p>Live event stream viewer for the running simulator. Filter by adds, cancels, fills, and watch depth maps update.</p>
+        <span class="tool-tag" style="background:rgba(86,212,221,.12);color:var(--cyan)">Stream</span>
+      </a>
+
+      <a href="report.html#dataexp" class="tool-card glass" onclick="navigateTab(event,'dataexp')">
+        <div class="tool-icon" style="background:rgba(210,153,34,.15);color:var(--yellow)">&#128269;</div>
+        <h3>Data Explorer</h3>
+        <p>Investigate synthetic LOBSTER-format data or live Binance candles. Price charts, volume, order flow imbalance, event breakdowns, and raw data tables.</p>
+        <span class="tool-tag" style="background:rgba(210,153,34,.12);color:var(--yellow)">Analysis</span>
+      </a>
+
+      <a href="report.html#feeds" class="tool-card glass" onclick="navigateTab(event,'feeds')">
+        <div class="tool-icon" style="background:rgba(248,81,73,.15);color:var(--red)">&#9889;</div>
+        <h3>Live Feeds</h3>
+        <p>Connect to Binance WebSocket streams. Watch real BTC/ETH/SOL order flow hit the engine live.</p>
+        <span class="tool-tag" style="background:rgba(248,81,73,.12);color:var(--red)">WebSocket</span>
+      </a>
+
+      <a href="report.html#gap" class="tool-card glass" onclick="navigateTab(event,'gap')">
+        <div class="tool-icon" style="background:rgba(63,185,80,.15);color:var(--green)">&#9888;</div>
+        <h3>Production Gap</h3>
+        <p>Honest assessment of what a production system needs that this project doesn't implement, and why.</p>
+        <span class="tool-tag" style="background:rgba(63,185,80,.12);color:var(--green)">Analysis</span>
+      </a>
+
+      <a href="report.html#models" class="tool-card glass" onclick="navigateTab(event,'models')">
+        <div class="tool-icon" style="background:rgba(188,140,255,.15);color:var(--purple)">&#9733;</div>
+        <h3>Model Deep Dive</h3>
+        <p>Detailed comparison of engine implementations: data structures, trade-offs, and design rationale.</p>
+        <span class="tool-tag" style="background:rgba(188,140,255,.12);color:var(--purple)">Architecture</span>
+      </a>
+
+      <a href="report.html#learn" class="tool-card glass" onclick="navigateTab(event,'learn')">
+        <div class="tool-icon" style="background:rgba(86,212,221,.15);color:var(--cyan)">&#128218;</div>
+        <h3>Learn</h3>
+        <p>Deep breakdown of LOB concepts, mechanical sympathy, memory hierarchy, and the full evolution from order book to trading ecosystem.</p>
+        <span class="tool-tag" style="background:rgba(86,212,221,.12);color:var(--cyan)">Education</span>
+      </a>
+
+      <a href="report.html#linux" class="tool-card glass" onclick="navigateTab(event,'linux')">
+        <div class="tool-icon" style="background:rgba(63,185,80,.15);color:var(--green)">&#128187;</div>
+        <h3>Linux Results</h3>
+        <p>Bare-metal benchmark results with step-by-step reproduction guide. isolcpus, taskset, rdtscp methodology.</p>
+        <span class="tool-tag" style="background:rgba(63,185,80,.12);color:var(--green)">Benchmark</span>
+      </a>
+
+      <a href="report.html#future" class="tool-card glass" onclick="navigateTab(event,'future')">
+        <div class="tool-icon" style="background:rgba(210,153,34,.15);color:var(--yellow)">&#128640;</div>
+        <h3>Future: Client Ecosystem</h3>
+        <p>Where the engine sits in a full exchange stack. Trading algos, client gateways, and the deliberate separation of infrastructure from strategy.</p>
+        <span class="tool-tag" style="background:rgba(210,153,34,.12);color:var(--yellow)">Roadmap</span>
+      </a>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══ ARCHITECTURE ═══ -->
+<section class="section">
+  <div class="wrap">
+    <div class="section-title">System Design</div>
+    <div class="section-heading">Edge Architecture</div>
+    <div class="glass" style="padding:20px;margin-bottom:40px">
+      <div class="arch-row">
+        <div class="arch-node tip-wrap">
+          <div class="name" style="color:var(--cyan)">Ingest Thread</div>
+          <div class="sub">Network / Parser</div>
+          <div class="tip"><b>Ingest Thread</b>Parses incoming market data (LOBSTER CSV or ITCH 5.0 binary) or network messages into fixed-size order structs. Runs on its own thread so parsing latency never stalls the matching core.<div class="dim">Supports auto-detection of format from file extension.</div></div>
+        </div>
+        <div class="arch-arrow">&#8594;</div>
+        <div class="arch-node tip-wrap" style="border:1px solid rgba(63,185,80,.3);border-radius:10px;background:rgba(63,185,80,.05)">
+          <div class="name" style="color:var(--green)">SPSC Queue</div>
+          <div class="sub">Inbound ring buffer</div>
+          <div class="tip"><b>Inbound SPSC Queue</b>Single-producer single-consumer lock-free ring buffer (power-of-2 capacity, 64K slots). The ingest thread pushes, the matching core pops. No locks, no syscalls &mdash; just atomic acquire/release on cache-line-padded head/tail indices.<div class="dim">Zero-copy: fixed-size messages, no heap allocation.</div></div>
+        </div>
+        <div class="arch-arrow">&#8594;</div>
+        <div class="arch-node tip-wrap" style="border:1px solid rgba(88,166,255,.3);border-radius:10px;background:rgba(88,166,255,.05)">
+          <div class="name" style="color:var(--blue)">Matching Core</div>
+          <div class="sub">Single pinned thread</div>
+          <div class="tip"><b>Matching Core</b>The hot path. Runs on a single CPU core pinned with taskset &mdash; no locks, no context switches, no allocations. Direct-indexed price array for O(1) lookup, pool allocator for O(1) order slots, intrusive doubly-linked FIFO per level for price-time priority.<div class="dim">This is where sub-microsecond latency lives.</div></div>
+        </div>
+        <div class="arch-arrow">&#8594;</div>
+        <div class="arch-node tip-wrap" style="border:1px solid rgba(63,185,80,.3);border-radius:10px;background:rgba(63,185,80,.05)">
+          <div class="name" style="color:var(--green)">SPSC Queue</div>
+          <div class="sub">Outbound ring buffer</div>
+          <div class="tip"><b>Outbound SPSC Queue</b>Matching core pushes trade/exec reports into this queue instead of calling callbacks that might block. Includes an overrun counter for back-pressure detection &mdash; if the publisher can't keep up, the counter increments (no data loss, just monitoring).<div class="dim">LMAX Disruptor pattern: fast core never waits on slow I/O.</div></div>
+        </div>
+        <div class="arch-arrow">&#8594;</div>
+        <div class="arch-node tip-wrap">
+          <div class="name" style="color:var(--purple)">Publisher Thread</div>
+          <div class="sub">Logging / Broadcast</div>
+          <div class="tip"><b>Publisher Thread</b>Drains the outbound queue in batches (up to 512 per spin). Handles slow work the core must never touch: logging, network broadcast, dashboard updates. Joins cleanly on shutdown after draining remaining messages.<div class="dim">Decouples I/O latency from matching latency.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">Tech Stack</div>
+    <div style="margin-top:16px" class="stack-grid">
+      <span class="stack-tag glass tip-wrap">C++20<div class="tip"><b>C++20</b>Concepts, constexpr, std::span, [[likely]]/[[unlikely]] branch hints, designated initializers. Enables zero-cost abstractions the compiler can fully inline.</div></span>
+      <span class="stack-tag glass tip-wrap">rdtscp Timing<div class="tip"><b>rdtscp</b>CPU timestamp counter instruction that also returns the core ID. Gives cycle-accurate latency measurement (~0.3ns resolution) and detects core migrations so contaminated samples are discarded. Calibrated against steady_clock at startup.</div></span>
+      <span class="stack-tag glass tip-wrap">Pool Allocator<div class="tip"><b>Pool Allocator</b>Pre-allocated slab of fixed-size order slots with an intrusive free list. O(1) allocate/deallocate, zero malloc on the hot path. Supports LIFO (cache-hot reuse) and FIFO (predictable aging) free-list policies.</div></span>
+      <span class="stack-tag glass tip-wrap">Intrusive Lists<div class="tip"><b>Intrusive Doubly-Linked Lists</b>prev/next pointers live inside the Order struct itself &mdash; no separate list-node allocation. O(1) append preserves time priority, O(1) unlink for cancel. Each price level is a FIFO queue of orders.</div></span>
+      <span class="stack-tag glass tip-wrap">SPSC Ring Buffer<div class="tip"><b>SPSC Ring Buffer</b>Lock-free single-producer single-consumer queue. Power-of-2 capacity with bitwise masking. Cache-line-padded head/tail to prevent false sharing. Acquire/release memory ordering &mdash; no fences, no CAS loops.</div></span>
+      <span class="stack-tag glass tip-wrap">Fibonacci Hash Map<div class="tip"><b>Fibonacci Hash Map</b>Open-addressed hash table using Fibonacci hashing (multiply by golden ratio, shift). Linear probing with tombstone deletion. Pre-sized at 2&times; expected count, never grows. Replaces std::unordered_map for the order ID lookup.</div></span>
+      <span class="stack-tag glass tip-wrap">GoogleTest<div class="tip"><b>GoogleTest</b>173 typed tests covering all three book implementations (OrderBook, RefOrderBook, PhotonBook) plus a reference-model fuzz cross-check that runs 1M+ random operations and compares every observable output.</div></span>
+      <span class="stack-tag glass tip-wrap">CMake<div class="tip"><b>CMake</b>Modern target-based build with FetchContent for dependencies. Separate targets for core library, tests, benchmarks, and demos. -O3 -march=native in Release for full ISA utilization.</div></span>
+      <span class="stack-tag glass tip-wrap">LOBSTER Parser<div class="tip"><b>LOBSTER Parser</b>Parses LOBSTER academic market data (CSV format with timestamp, event type, order ID, size, price, direction). Configurable tick divisor to map decimal prices to integer ticks.</div></span>
+      <span class="stack-tag glass tip-wrap">ITCH 5.0 Parser<div class="tip"><b>NASDAQ ITCH 5.0</b>Binary protocol parser for NASDAQ's Total View feed. Big-endian readers, fixed-size message types (A/F/E/C/X/D/U), symbol filtering, optional 2-byte length prefixes. Handles 20+ message types.</div></span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CLI TOOLS ═══ -->
+<section class="section">
+  <div class="wrap">
+    <div class="section-title">Terminal Tools</div>
+    <div class="section-heading">Built Executables</div>
+    <div class="cli-grid">
+
+      <div class="cli-card glass">
+        <div class="cli-cmd">./build/lob_bench</div>
+        <h3>Benchmark Driver</h3>
+        <p>Per-operation-type latency measurement using rdtscp. Steady-state book with warmup, reporting p50/p99/p99.9/max for submit, match, cancel, and modify.</p>
+        <div class="cli-preview"><span style="color:#484f58;font-style:italic">— AWS c5.metal bare-metal, 500K ops/category, 10K depth —</span>
+<span class="w">TSC calibration:</span> <span class="g">3.00 GHz</span> (invariant TSC verified)
+<span class="w">Warming up</span> 50,000 ops...
+
+<span class="b">submit (resting):</span>
+  <span class="g">p50</span>  48 ns    <span class="y">p99</span>  60 ns    <span class="r">p99.9</span>  68 ns    <span class="w">max</span>  46 µs
+<span class="b">submit (match):</span>
+  <span class="g">p50</span>  78 ns    <span class="y">p99</span>  144 ns    <span class="r">p99.9</span>  164 ns    <span class="w">max</span>  24 µs
+<span class="b">cancel:</span>
+  <span class="g">p50</span>  100 ns    <span class="y">p99</span>  140 ns    <span class="r">p99.9</span>  157 ns    <span class="w">max</span>  8 µs
+<span class="b">modify:</span>
+  <span class="g">p50</span>  136 ns    <span class="y">p99</span>  184 ns    <span class="r">p99.9</span>  200 ns    <span class="w">max</span>  4 µs</div>
+      </div>
+
+      <div class="cli-card glass">
+        <div class="cli-cmd">./build/lob_dashboard</div>
+        <h3>Live Dashboard</h3>
+        <p>3-thread SPSC terminal UI. Ingest producer, matching core, and publisher all connected via lock-free queues. Displays queue depths and trade tape in real time.</p>
+        <div class="cli-preview"><span class="p">[Producer]</span> <span class="w">→</span> <span class="g">SPSC[2/64K]</span> <span class="w">→</span> <span class="b">[Core]</span> <span class="w">→</span> <span class="g">SPSC[0/64K]</span> <span class="w">→</span> <span class="p">[Pub]</span>
+
+<span class="w">Best Bid:</span> <span class="g">1002</span>  <span class="w">Best Ask:</span> <span class="r">1003</span>  <span class="w">Spread:</span> 1
+<span class="w">Orders:</span> 847   <span class="w">Trades:</span> 12,490
+
+<span class="y">TRADE</span> <span class="g">BUY</span>  5 @ 1002    <span class="y">TRADE</span> <span class="r">SELL</span> 3 @ 1003
+<span class="y">TRADE</span> <span class="g">BUY</span>  8 @ 1002    <span class="y">TRADE</span> <span class="r">SELL</span> 2 @ 1004</div>
+      </div>
+
+      <div class="cli-card glass">
+        <div class="cli-cmd">./build/lob_replay file &lt;path&gt;</div>
+        <h3>Market Data Replay</h3>
+        <p>Replay LOBSTER CSV or NASDAQ ITCH 5.0 binary data through the engine. Auto-detects format, reports per-action-type stats.</p>
+        <div class="cli-preview"><span class="b">Detected format:</span> <span class="g">LOBSTER</span> (CSV)
+<span class="w">Replaying</span> AAPL_2024-01-02.csv...
+
+<span class="w">Events processed:</span> <span class="g">284,391</span>
+  <span class="b">Add:</span>    156,220  <span class="b">Cancel:</span>  98,441
+  <span class="b">Modify:</span>  18,302  <span class="b">Execute:</span> 11,428
+
+<span class="w">Replay time:</span> <span class="y">0.42s</span>  (<span class="g">677k</span> events/sec)</div>
+      </div>
+
+      <div class="cli-card glass">
+        <div class="cli-cmd">./build/lob_ablation</div>
+        <h3>Ablation Study</h3>
+        <p>Isolate each optimization's latency contribution by changing one variable at a time. Produces an honest waterfall showing where performance comes from.</p>
+        <div class="cli-preview"><span style="color:#484f58;font-style:italic">— AWS c5.metal, 200K ops, one variable changed at a time —</span>
+
+<span class="b">Baseline (all opts):</span>     <span class="g">54 ns</span>  p50
+<span class="y">+ std::map levels:</span>       <span class="y">94 ns</span>  p50  <span class="r">(+74%)</span>
+<span class="y">+ new/delete (no pool):</span>  <span class="y">72 ns</span>  p50  <span class="r">(+33%)</span>
+<span class="r">+ linear BBO scan:</span>      <span class="r">536 ns</span>  p50  <span class="r">(+893%)</span>
+
+<span class="w">Impact waterfall (p50 overhead vs baseline):</span>
+  <span class="r">BBO caching</span>            <span class="r">+482 ns</span>  <span class="r">##############################</span>
+  <span class="y">Direct-indexed array</span>   <span class="y"> +40 ns</span>  <span class="y">##</span>
+  <span class="g">Pool allocator</span>         <span class="g"> +18 ns</span>  <span class="g">#</span></div>
+      </div>
+
+      <div class="cli-card glass">
+        <div class="cli-cmd">./build/lob_demo</div>
+        <h3>Quick Demo</h3>
+        <p>Simple terminal demonstration of order submission, matching, and cancellation with visible output for each operation.</p>
+        <div class="cli-preview"><span class="g">SUBMIT</span> BUY  10 @ 1000  → id=1 <span class="w">(resting)</span>
+<span class="g">SUBMIT</span> BUY   5 @ 1001  → id=2 <span class="w">(resting)</span>
+<span class="r">SUBMIT</span> SELL  8 @ 1001  → id=3
+  <span class="y">FILL</span> 5 @ 1001 (id=3 vs id=2)
+  <span class="y">FILL</span> 3 @ 1000 (id=3 vs id=1)
+<span class="w">CANCEL</span> id=1 → remaining 7 removed
+<span class="w">Book:</span> bid=<span class="g">empty</span>  ask=<span class="r">empty</span></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer>
+  <p>LOB Matching Engine &middot; C++20 &middot; Built by <a href="https://github.com/JadenBresciaVillanova">Jaden Brescia</a></p>
+</footer>
+
+<script>
+function navigateTab(e, tab) {
+  e.preventDefault();
+  const url = 'report.html';
+  const w = window.open(url, '_self');
+  sessionStorage.setItem('lob_tab', tab);
+  window.location.href = url;
+}
+
+// Cursor glow
+const glow = document.getElementById('cursorGlow');
+document.addEventListener('mousemove', e => {
+  glow.style.left = e.clientX + 'px';
+  glow.style.top = e.clientY + 'px';
+});
+</script>
+</body>
+</html>
