@@ -91,7 +91,7 @@ sudo cpupower frequency-set -g performance
 ## Step 4 — build Release and run pinned
 
 ```bash
-git clone <your-repo> lob && cd lob
+git clone https://github.com/JadenBresciaVillanova/cpp-matching-engine.git lob && cd lob
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 taskset -c 3 ./build/lob_bench           # run the engine ON the isolated core

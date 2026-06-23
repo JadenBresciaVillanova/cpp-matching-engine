@@ -1,5 +1,7 @@
 # lob — Cache-Optimized Limit Order Book & Matching Engine
 
+[![CI](https://github.com/JadenBresciaVillanova/cpp-matching-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/JadenBresciaVillanova/cpp-matching-engine/actions/workflows/ci.yml)
+
 A single-threaded, allocation-free limit order book and matching engine in
 C++20. Built to demonstrate the data-structure and systems-engineering
 techniques that real HFT matching engines use: direct-indexed O(1) price
