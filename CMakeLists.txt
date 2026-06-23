@@ -60,6 +60,17 @@ else()
 endif()
 
 # -----------------------------------------------------------------------------
+# Sanitizers (ASan + UBSan). Enable with -DLOB_SANITIZE=ON for local use;
+# the CI workflow enables this automatically in its sanitizer job.
+# -----------------------------------------------------------------------------
+option(LOB_SANITIZE "Build with AddressSanitizer + UndefinedBehaviorSanitizer" OFF)
+if(LOB_SANITIZE AND NOT MSVC)
+    set(SAN_FLAGS "-fsanitize=address,undefined -fno-omit-frame-pointer")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SAN_FLAGS}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${SAN_FLAGS}")
+endif()
+
+# -----------------------------------------------------------------------------
 # Tests (GoogleTest via FetchContent - no system install needed).
 # -----------------------------------------------------------------------------
 option(LOB_BUILD_TESTS "Build unit/property tests" ON)
@@ -76,8 +87,26 @@ if(LOB_BUILD_TESTS)
     )
     target_link_libraries(lob_tests PRIVATE lob_core GTest::gtest_main)
 
+    add_executable(lob_fuzz
+        tests/fuzz_cross_check.cpp
+    )
+    target_link_libraries(lob_fuzz PRIVATE lob_core GTest::gtest_main)
+
+    add_executable(lob_spsc_tests
+        tests/test_spsc_queue.cpp
+    )
+    target_link_libraries(lob_spsc_tests PRIVATE lob_core GTest::gtest_main)
+
+    add_executable(lob_photon_tests
+        tests/test_photon.cpp
+    )
+    target_link_libraries(lob_photon_tests PRIVATE lob_core GTest::gtest_main)
+
     include(GoogleTest)
     gtest_discover_tests(lob_tests)
+    gtest_discover_tests(lob_fuzz)
+    gtest_discover_tests(lob_spsc_tests)
+    gtest_discover_tests(lob_photon_tests)
 endif()
 
 # -----------------------------------------------------------------------------
@@ -89,4 +118,32 @@ if(LOB_BUILD_BENCH)
         benchmarks/bench_main.cpp
     )
     target_link_libraries(lob_bench PRIVATE lob_core)
+
+    add_executable(lob_ablation
+        benchmarks/ablation_main.cpp
+    )
+    target_link_libraries(lob_ablation PRIVATE lob_core)
+
+    add_executable(lob_replay
+        benchmarks/replay_main.cpp
+    )
+    target_link_libraries(lob_replay PRIVATE lob_core)
 endif()
+
+# -----------------------------------------------------------------------------
+# Live terminal demos / dashboard.
+# -----------------------------------------------------------------------------
+add_executable(lob_demo
+    demos/demo_main.cpp
+)
+target_link_libraries(lob_demo PRIVATE lob_core)
+
+add_executable(lob_dashboard
+    demos/dashboard_main.cpp
+)
+target_link_libraries(lob_dashboard PRIVATE lob_core)
+
+add_executable(lob_report
+    tools/report_main.cpp
+)
+target_link_libraries(lob_report PRIVATE lob_core)
