@@ -1,11 +1,7 @@
 // order_book.cpp
-// Implementation of the OrderBook hot path.
-//
-// STAGE 1 SCAFFOLD: constructor + the trivial accessors are real. The matching
-// logic (submit/cancel/modify and the private helpers) is stubbed and will be
-// filled in together in stage 2, where each branch (limit rest, market sweep,
-// IOC/FOK, partial fill, best-price reprice) is implemented and unit-tested as
-// it lands. The stubs let the whole tree build and link now.
+// Implementation of the OrderBook matching engine hot path.
+// Covers: limit/market/IOC/FOK submission, cancel, modify, and the
+// price-time priority matching sweep with self-trade prevention.
 
 #include "lob/order_book.hpp"
 
@@ -17,29 +13,42 @@ OrderBook::OrderBook(std::size_t tick_range, std::size_t max_orders)
 }
 
 ExecResult OrderBook::submit(OrderId id, Side side, OrderType type,
-                             Price price, Quantity qty) {
-    // STAGE 2, STEP 2: matching limit orders.
-    //   1. Match against the opposite side honoring price-time priority.
-    //   2. Rest any unmatched remainder (Limit only; Market/IOC/FOK handled in
-    //      the next step - for now non-Limit types still no-op out).
+                             Price price, Quantity qty, OwnerId owner) {
     ExecResult r;
     r.id = id;
 
-    if (type != OrderType::Limit) {
-        // Market/IOC/FOK arrive in step 3. Until then, do not pretend to fill.
-        return r; // accepted = false
+    // FOK: reject immediately if the full quantity cannot be filled.
+    if (type == OrderType::Fok) {
+        if (!can_fill(side, price, qty, owner)) return r;
     }
 
+    // Market orders use a worst-case limit price so the cross test in match()
+    // always passes while liquidity remains. Limit/IOC/FOK use the caller's
+    // price directly.
+    const Price limit_price = (type == OrderType::Market)
+        ? ((side == Side::Buy) ? static_cast<Price>(levels_.size() - 1)
+                               : Price{0})
+        : price;
+
     Quantity remaining = qty;
-    const Quantity filled = match(id, side, price, remaining);
+    const Quantity filled = match(id, side, limit_price, remaining, owner);
 
     r.accepted = true;
     r.filled = filled;
     r.fully_filled = (remaining == 0);
 
-    if (remaining > 0) {
-        rest_order(id, side, price, remaining);
-        r.resting = remaining;
+    // Only Limit orders rest their unmatched remainder. Market/IOC/FOK
+    // implicitly cancel it — the order is done after the sweep.
+    // After STP (cancel-incoming) fires, the book still crosses at this price,
+    // so resting would create a crossed book — don't rest in that case.
+    if (remaining > 0 && type == OrderType::Limit) {
+        bool would_cross =
+            (side == Side::Buy  && best_ask_ >= 0 && price >= best_ask_) ||
+            (side == Side::Sell && best_bid_ >= 0 && price <= best_bid_);
+        if (!would_cross) {
+            rest_order(id, side, price, remaining, owner);
+            r.resting = remaining;
+        }
     }
     return r;
 }
@@ -50,26 +59,30 @@ ExecResult OrderBook::submit(OrderId id, Side side, OrderType type,
 // longer crosses. Relies on unlink_and_free to drop fully-consumed resting
 // orders and to reprice the best when a level empties.
 Quantity OrderBook::match(OrderId incoming_id, Side incoming_side,
-                          Price limit_price, Quantity& remaining) {
+                          Price limit_price, Quantity& remaining,
+                          OwnerId incoming_owner) {
     Quantity total_filled = 0;
 
     while (remaining > 0) {
         // Is there a crossing level on the opposite side?
         PoolHandle resting_h = kNullHandle;
         if (incoming_side == Side::Buy) {
-            // Buyer crosses the best ask if best_ask_ exists and <= limit.
             if (best_ask_ < 0 || best_ask_ > limit_price) break;
             resting_h = levels_[best_ask_].head;
         } else {
-            // Seller crosses the best bid if best_bid_ exists and >= limit.
             if (best_bid_ < 0 || best_bid_ < limit_price) break;
             resting_h = levels_[best_bid_].head;
         }
 
         Order& resting = pool_[resting_h];
+
+        // Self-trade prevention (cancel-incoming policy): if both orders
+        // belong to the same non-anonymous owner, kill the incoming order.
+        if (incoming_owner != 0 && incoming_owner == resting.owner) break;
+
         const Quantity traded =
             (remaining < resting.remaining) ? remaining : resting.remaining;
-        const Price trade_price = resting.price; // resting order has price priority
+        const Price trade_price = resting.price;
 
         // Emit the trade.
         if (trade_sink_) {
@@ -110,15 +123,89 @@ bool OrderBook::cancel(OrderId id) {
     return true;
 }
 
-ExecResult OrderBook::modify(OrderId /*id*/, Price /*new_price*/,
-                             Quantity /*new_qty*/) {
-    // TODO(stage2): in-place size decrease keeps priority; price change or size
-    // increase => cancel + resubmit (loses priority).
-    return ExecResult{};
+ExecResult OrderBook::modify(OrderId id, Price new_price, Quantity new_qty) {
+    auto it = id_index_.find(id);
+    if (it == id_index_.end()) return ExecResult{};
+
+    const PoolHandle h = it->second;
+    Order& o = pool_[h];
+
+    // Modify to zero is a cancellation.
+    if (new_qty == 0) {
+        unlink_and_free(h);
+        id_index_.erase(it);
+        ExecResult r;
+        r.id = id;
+        r.accepted = true;
+        return r;
+    }
+
+    // Same price, quantity did not increase: in-place edit keeps time priority.
+    if (new_price == o.price && new_qty <= o.remaining) {
+        const Quantity delta = o.remaining - new_qty;
+        o.remaining = new_qty;
+        levels_[o.price].total -= delta;
+        ExecResult r;
+        r.id = id;
+        r.accepted = true;
+        r.resting = new_qty;
+        return r;
+    }
+
+    // Price change or size increase: cancel + resubmit (loses priority).
+    // If the new price crosses the book, submit() routes through matching.
+    const Side side = o.side;
+    const OwnerId owner = o.owner;
+    unlink_and_free(h);
+    id_index_.erase(it);
+    return submit(id, side, OrderType::Limit, new_price, new_qty, owner);
+}
+
+// Read-only walk for FOK: count crossing liquidity on the opposite side
+// without modifying the book. Owner-aware: with cancel-incoming STP, the
+// sweep dies at the first same-owner order, so we stop counting there.
+bool OrderBook::can_fill(Side incoming_side, Price limit_price,
+                         Quantity qty, OwnerId incoming_owner) const noexcept {
+    Quantity available = 0;
+
+    // When owner is non-zero, we must walk the FIFO to detect where a
+    // same-owner order would kill the sweep. When owner == 0 (no STP) we
+    // can use the pre-aggregated level total for speed.
+    auto count_level = [&](Price p) -> bool {
+        if (incoming_owner == 0) {
+            available += levels_[p].total;
+            return true;
+        }
+        PoolHandle h = levels_[p].head;
+        while (h != kNullHandle) {
+            const Order& o = pool_[h];
+            if (o.owner == incoming_owner) return false;
+            available += o.remaining;
+            h = o.next;
+        }
+        return true;
+    };
+
+    if (incoming_side == Side::Buy) {
+        if (best_ask_ < 0 || best_ask_ > limit_price) return false;
+        const Price cap = static_cast<Price>(levels_.size());
+        for (Price p = best_ask_; p < cap && p <= limit_price; ++p) {
+            if (!count_level(p)) break;
+            if (available >= qty) return true;
+        }
+    } else {
+        if (best_bid_ < 0 || best_bid_ < limit_price) return false;
+        for (Price p = best_bid_; p >= 0 && p >= limit_price; --p) {
+            if (!count_level(p)) break;
+            if (available >= qty) return true;
+        }
+    }
+    return available >= qty;
 }
 
 // Append a non-crossing order onto the tail of its price level's FIFO. All O(1).
-void OrderBook::rest_order(OrderId id, Side side, Price price, Quantity qty) {
+void OrderBook::rest_order(OrderId id, Side side, Price price, Quantity qty,
+                           OwnerId owner) {
     const PoolHandle h = pool_.allocate();
     if (h == kNullHandle) {
         // Pool exhausted. A real engine rejects the order here; for now we
@@ -132,6 +219,7 @@ void OrderBook::rest_order(OrderId id, Side side, Price price, Quantity qty) {
     o.side      = side;
     o.price     = price;
     o.remaining = qty;
+    o.owner     = owner;
     o.prev      = kNullHandle;
     o.next      = kNullHandle;
 

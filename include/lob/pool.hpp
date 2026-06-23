@@ -43,46 +43,59 @@ namespace lob {
 using PoolHandle = std::uint32_t;
 inline constexpr PoolHandle kNullHandle = static_cast<PoolHandle>(-1);
 
-template <class T>
+// Free-list policy: LIFO reuses the most recently freed slot (hot in cache,
+// good for temporal locality). FIFO reuses the longest-freed slot (more
+// uniform distribution across the pool, more predictable latency after
+// heavy cancel/resubmit churn).
+enum class FreeListPolicy { Lifo, Fifo };
+
+template <class T, FreeListPolicy Policy = FreeListPolicy::Lifo>
 class Pool {
 public:
     using Handle = PoolHandle;
     static constexpr Handle kInvalid = kNullHandle;
 
     explicit Pool(std::size_t capacity) : nodes_(capacity) {
-        // Thread every slot onto the free list: 0 -> 1 -> 2 -> ... -> end.
         for (std::size_t i = 0; i + 1 < capacity; ++i) {
             nodes_[i].next_free = static_cast<Handle>(i + 1);
         }
         if (capacity > 0) {
             nodes_[capacity - 1].next_free = kInvalid;
             free_head_ = 0;
+            if constexpr (Policy == FreeListPolicy::Fifo) {
+                free_tail_ = static_cast<Handle>(capacity - 1);
+            }
         }
     }
 
-    // O(1). Returns kInvalid when exhausted (caller must handle, e.g. reject the
-    // incoming order rather than crash).
     Handle allocate() noexcept {
-        // Asserted here rather than at class scope so that T need only be a
-        // complete type at the point of first use, not at instantiation. This
-        // lets a type hold a Pool of itself indirectly without a circular
-        // completeness requirement.
         static_assert(std::is_trivially_copyable<T>::value,
                       "Pool<T> assumes trivially copyable T; revisit lifetime "
                       "management (placement new / destroy_at) if this changes.");
-        if (free_head_ == kInvalid) return kInvalid;
+        if (free_head_ == kInvalid) [[unlikely]] return kInvalid;
         const Handle h = free_head_;
         free_head_ = nodes_[h].next_free;
+        if constexpr (Policy == FreeListPolicy::Fifo) {
+            if (free_head_ == kInvalid) free_tail_ = kInvalid;
+        }
         ++in_use_;
         return h;
     }
 
-    // O(1). Returns the slot to the free list. We do not run T's destructor here
-    // because T is a trivial POD order record; if T ever gains non-trivial
-    // members this must call std::destroy_at and allocate() must placement-new.
     void deallocate(Handle h) noexcept {
-        nodes_[h].next_free = free_head_;
-        free_head_ = h;
+        if constexpr (Policy == FreeListPolicy::Fifo) {
+            // Append to tail: recently freed slots go to the back of the line.
+            nodes_[h].next_free = kInvalid;
+            if (free_tail_ != kInvalid)
+                nodes_[free_tail_].next_free = h;
+            else
+                free_head_ = h;
+            free_tail_ = h;
+        } else {
+            // Push to head: most recently freed slot is reused first (hot cache).
+            nodes_[h].next_free = free_head_;
+            free_head_ = h;
+        }
         --in_use_;
     }
 
@@ -93,19 +106,16 @@ public:
     std::size_t in_use() const noexcept   { return in_use_; }
 
 private:
-    // A slot is either a live T or a free-list link. We overlap them in a union
-    // so the free list costs no extra memory. T must be trivially handled for
-    // this to be safe without explicit lifetime management; static_assert guards
-    // that assumption so a future change to T fails loudly instead of silently.
     union Node {
         T value;
         Handle next_free;
-        Node() noexcept {}   // union with non-trivial members needs a ctor
+        Node() noexcept {}
         ~Node() noexcept {}
     };
 
     std::vector<Node> nodes_;
     Handle free_head_ = kInvalid;
+    Handle free_tail_ = kInvalid;  // used only by Fifo policy
     std::size_t in_use_ = 0;
 };
 

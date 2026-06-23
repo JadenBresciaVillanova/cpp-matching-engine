@@ -72,6 +72,7 @@ struct Order {
     OrderId  id    = kNullOrderId;
     Price    price = 0;
     Side     side  = Side::Buy;
+    OwnerId  owner = 0;           // for self-trade prevention; 0 = anonymous
 };
 
 // A single price level: a FIFO of orders plus an aggregate quantity so we can
@@ -81,25 +82,6 @@ struct PriceLevel {
     PoolHandle tail = kNullHandle; // newest
     Quantity total = 0;                                // sum of remaining at level
     bool empty() const noexcept { return head == kNullHandle; }
-};
-
-// Reported when two orders match. Pushed to a sink so the engine core never
-// formats or transmits anything itself (that is edge work).
-struct Trade {
-    OrderId  resting_id;
-    OrderId  incoming_id;
-    Price    price;       // trade executes at the RESTING order's price
-    Quantity quantity;
-    Sequence seq;
-};
-
-// Result of submitting an order, returned to the caller / publisher.
-struct ExecResult {
-    OrderId  id = kNullOrderId;
-    Quantity filled = 0;     // total quantity that traded on submission
-    Quantity resting = 0;    // quantity left resting in the book afterwards
-    bool     accepted = false;
-    bool     fully_filled = false;
 };
 
 class OrderBook {
@@ -112,8 +94,9 @@ public:
 
     // Submit an order. Matching semantics depend on `type`. Trades generated on
     // the way are emitted to the sink in execution order. This is THE hot path.
+    // `owner` identifies the participant for self-trade prevention (0 = no STP).
     ExecResult submit(OrderId id, Side side, OrderType type, Price price,
-                      Quantity qty);
+                      Quantity qty, OwnerId owner = 0);
 
     // Cancel a resting order by id. O(1): id -> handle -> unlink. Returns true
     // if the order was live and is now removed.
@@ -129,8 +112,16 @@ public:
     // Top-of-book queries, O(1).
     Price best_bid() const noexcept { return best_bid_; }
     Price best_ask() const noexcept { return best_ask_; }
-    Quantity bid_size_at(Price p) const noexcept { return levels_[p].total; }
-    Quantity ask_size_at(Price p) const noexcept { return levels_[p].total; }
+    Quantity bid_size_at(Price p) const noexcept {
+        const auto& lvl = levels_[p];
+        if (lvl.empty()) return 0;
+        return (pool_[lvl.head].side == Side::Buy) ? lvl.total : 0;
+    }
+    Quantity ask_size_at(Price p) const noexcept {
+        const auto& lvl = levels_[p];
+        if (lvl.empty()) return 0;
+        return (pool_[lvl.head].side == Side::Sell) ? lvl.total : 0;
+    }
 
     void set_trade_sink(TradeSink sink) { trade_sink_ = std::move(sink); }
 
@@ -145,10 +136,18 @@ private:
     // price so the cross test always passes while liquidity remains. Returns the
     // quantity that was filled; updates *remaining in place.
     Quantity match(OrderId incoming_id, Side incoming_side, Price limit_price,
-                   Quantity& remaining);
+                   Quantity& remaining, OwnerId incoming_owner);
+
+    // Read-only check for FOK: can `qty` units be filled at prices crossing
+    // `limit_price` on the opposite side? Owner-aware: with cancel-incoming
+    // STP, a same-owner resting order would kill the sweep, so liquidity
+    // behind it is unreachable and must not be counted.
+    bool can_fill(Side incoming_side, Price limit_price,
+                  Quantity qty, OwnerId incoming_owner) const noexcept;
 
     // Append a fully-or-partially-unmatched order onto its resting level.
-    void rest_order(OrderId id, Side side, Price price, Quantity qty);
+    void rest_order(OrderId id, Side side, Price price, Quantity qty,
+                    OwnerId owner);
     // Walk inward to refresh best_bid_/best_ask_ after a level empties.
     void reprice_best_bid() noexcept;
     void reprice_best_ask() noexcept;
@@ -157,6 +156,11 @@ private:
 
     std::vector<PriceLevel> levels_;            // direct-indexed by tick
     Pool<Order>             pool_;              // all order storage
+
+    // Teaching implementation deliberately uses std::unordered_map here.
+    // PhotonBook demonstrates the production alternative (FlatMap: open-addressed,
+    // cache-friendly, zero-allocation). Same applies to std::function TradeSink
+    // above vs PhotonBook's compile-time-polymorphic template Sink.
     std::unordered_map<OrderId, PoolHandle> id_index_; // id -> slot
 
     Price best_bid_ = -1;   // -1 sentinel: no bids
