@@ -160,7 +160,7 @@ ID, so samples spanning a core migration are detected and discarded.
 
 ### Interactive Dashboard
 - **13-tab HTML dashboard** (`report.html`) with live order book visualization
-- Solo Simulator, Latency Race, P&L Race with 4 engine model variants
+- Solo Simulator, Latency Race, Outcome Variance with 4 engine model variants
 - Live Binance WebSocket integration (BTC, ETH, SOL, DOGE, XRP)
 - Data Explorer loading real LOBSTER-format sample data
 - C++ source reference, production gap analysis, architecture education

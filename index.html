@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="A cache-optimized C++20 limit order book and matching engine. 48ns p50 submit, 78ns p50 match on bare metal. O(1) price lookup, zero allocation, single-threaded core, rdtscp timing. Interactive dashboard and 173 passing tests.">
+<meta name="description" content="A C++20 limit order book and matching engine using the same data-structure techniques as production HFT systems. 48ns p50 submit on bare metal. O(1) price lookup, zero allocation, single-threaded core, rdtscp timing.">
 <title>LOB Matching Engine — C++20 Low-Latency Order Book</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='80'>⚡</text></svg>">
 <link rel="prefetch" href="report.html" as="document">
@@ -370,6 +370,38 @@ details summary::-webkit-details-marker{display:none}
   transition:opacity .3s;
 }
 
+/* ── live demo ── */
+.demo-section{padding:0 0 20px}
+.demo-card{padding:0;overflow:hidden}
+.demo-header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid rgba(255,255,255,.06)}
+.demo-header h2{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--dim)}
+.demo-header h2 span{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:8px;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.demo-stats{display:flex;gap:18px;font-size:11px;color:var(--dim);font-family:'SF Mono',Consolas,monospace}
+.demo-stats b{font-weight:500;margin-right:4px}
+.demo-body{display:grid;grid-template-columns:1fr 280px;min-height:320px}
+.demo-book{padding:10px 16px;font-family:'SF Mono',Consolas,monospace;font-size:11px}
+.demo-book-title{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);font-weight:600;margin-bottom:6px}
+.demo-ask-row,.demo-bid-row{display:grid;grid-template-columns:50px 36px 1fr;align-items:center;height:22px;gap:4px}
+.demo-ask-row .dp{color:var(--red);text-align:right;font-size:11px}
+.demo-ask-row .dq{color:var(--red);text-align:right;font-size:11px;opacity:.8}
+.demo-bid-row .dp{color:var(--green);text-align:right;font-size:11px}
+.demo-bid-row .dq{color:var(--green);text-align:right;font-size:11px;opacity:.8}
+.demo-ask-row .dp.best{font-weight:700;opacity:1}.demo-bid-row .dp.best{font-weight:700;opacity:1}
+.demo-bar-cell{height:14px;position:relative}
+.d-bar{height:100%;border-radius:2px;transition:width .12s ease;min-width:2px}
+.d-bar.ask{background:rgba(248,81,73,.25)}.d-bar.bid{background:rgba(63,185,80,.25)}
+.demo-spread-row{text-align:center;font-size:10px;color:var(--dim);padding:4px 0;margin:2px 0;border-top:1px dashed rgba(255,255,255,.06);border-bottom:1px dashed rgba(255,255,255,.06);letter-spacing:.3px}
+.demo-spread-row span{color:var(--yellow);font-weight:600}
+.demo-tape-wrap{border-left:1px solid rgba(255,255,255,.06);padding:10px 16px;font-family:'SF Mono',Consolas,monospace;font-size:11px;display:flex;flex-direction:column}
+.demo-tape-title{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);font-weight:600;margin-bottom:6px}
+.demo-tape{flex:1;overflow:hidden}
+.demo-trade{padding:2px 0;line-height:1.6;opacity:0;animation:dtFade .25s forwards}
+@keyframes dtFade{to{opacity:1}}
+.demo-footer{padding:10px 20px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--dim)}
+.demo-footer a{color:var(--blue);text-decoration:none;font-weight:600;font-size:12px;transition:opacity .2s}
+.demo-footer a:hover{opacity:.8}
+
 @media(max-width:700px){
   .hero{padding:60px 16px 40px}
   .hero-stats{gap:24px}
@@ -377,6 +409,9 @@ details summary::-webkit-details-marker{display:none}
   .arch-row{flex-direction:column}
   .arch-arrow{transform:rotate(90deg)}
   .cursor-glow{display:none}
+  .demo-body{grid-template-columns:1fr}
+  .demo-tape-wrap{border-left:none;border-top:1px solid rgba(255,255,255,.06)}
+  .demo-stats{gap:10px;flex-wrap:wrap}
 }
 </style>
 </head>
@@ -392,7 +427,7 @@ details summary::-webkit-details-marker{display:none}
 <section class="hero">
   <div class="hero-badge">C++20 &middot; Zero-Allocation &middot; Single-Threaded Core</div>
   <h1>LOB Matching<br>Engine</h1>
-  <p>A cache-optimized limit order book with O(1) submit, cancel, and modify. 48ns p50 submit latency on bare metal. Zero allocation, single-threaded core.</p>
+  <p>A C++20 limit order book built with the same data-structure and systems-engineering techniques used in production matching engines. 48ns p50 submit on bare metal.</p>
   <div class="hero-stats">
     <div class="hero-stat tip-wrap"><div class="n" style="color:var(--green)">O(1)</div><div class="l">Price Lookup</div><div class="tip"><b>O(1) Price Lookup</b>Price levels are stored in a direct-indexed array keyed by tick index. Looking up any price is a single array access &mdash; no tree traversal, no hash computation. This gives constant-time submit, cancel, and BBO queries regardless of how many levels are active.</div></div>
     <a href="report.html#learn" onclick="sessionStorage.setItem('lob_tab','learn');sessionStorage.setItem('lob_learn_view','tool')" class="hero-stat tip-wrap" style="text-decoration:none;color:inherit;cursor:pointer"><div class="n" style="color:var(--blue)">173</div><div class="l">Tests Passing</div><div class="tip"><b>173 Tests Across 4 Binaries</b>Typed GoogleTest cases run against all three book implementations (OrderBook, PhotonBook, RefOrderBook). A fuzz cross-checker runs 1M+ random operations comparing every observable output against a reference model. Click to see the full test breakdown.</div></a>
@@ -402,6 +437,36 @@ details summary::-webkit-details-marker{display:none}
   <div class="hero-actions">
     <a href="report.html" class="btn btn-primary">Launch Dashboard</a>
     <a href="https://github.com/JadenBresciaVillanova/cpp-matching-engine" class="btn btn-ghost">View Source</a>
+  </div>
+</section>
+
+<!-- ═══ LIVE DEMO ═══ -->
+<section class="demo-section">
+  <div class="wrap">
+    <div class="demo-card glass">
+      <div class="demo-header">
+        <h2><span></span>Live Engine Preview</h2>
+        <div class="demo-stats">
+          <span><b>BBO</b> <span id="demoBBO">— / —</span></span>
+          <span><b>Spread</b> <span id="demoSpread" style="color:var(--yellow)">—</span></span>
+          <span><b>Trades</b> <span id="demoTrades" style="color:var(--green)">0</span></span>
+        </div>
+      </div>
+      <div class="demo-body">
+        <div class="demo-book">
+          <div class="demo-book-title">Order Book</div>
+          <div id="demoBook"></div>
+        </div>
+        <div class="demo-tape-wrap">
+          <div class="demo-tape-title">Trade Tape</div>
+          <div class="demo-tape" id="demoTape"></div>
+        </div>
+      </div>
+      <div class="demo-footer">
+        <span>Same price-time priority matching logic, running live in your browser</span>
+        <a href="report.html">Open Full Dashboard &rarr;</a>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -446,7 +511,7 @@ details summary::-webkit-details-marker{display:none}
         <!-- ── WHAT THIS PROJECT DOES ── -->
         <div style="background:rgba(63,185,80,.04);border:1px solid rgba(63,185,80,.15);border-radius:10px;padding:16px;margin-bottom:16px">
           <h3 style="font-size:14px;font-weight:600;color:var(--green);margin-bottom:10px">What This Project Builds</h3>
-          <p style="color:var(--dim);font-size:12.5px;line-height:1.8;margin:0 0 12px">A production-grade matching engine core in C++20, using the same techniques real exchanges use:</p>
+          <p style="color:var(--dim);font-size:12.5px;line-height:1.8;margin:0 0 12px">A matching engine core in C++20 that applies the same data-structure and measurement techniques used in real exchange infrastructure:</p>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">
             <div style="color:var(--dim);font-size:12px;line-height:1.8">
               <div style="margin-bottom:4px"><b style="color:var(--text)">O(1) price lookup</b> &mdash; prices map directly to array indices, so finding a price level is a single memory access (no searching)</div>
@@ -507,15 +572,15 @@ details summary::-webkit-details-marker{display:none}
       <a href="report.html#multi" class="tool-card glass" onclick="navigateTab(event,'multi')">
         <div class="tool-icon" style="background:rgba(188,140,255,.15);color:var(--purple)">&#9776;</div>
         <h3>Latency Race</h3>
-        <p>Race all four engines on the same workload. Same P&L, different speeds — isolates pure latency differences.</p>
+        <p>Race all four engines on the same workload. Same fills, different speeds — isolates pure latency differences.</p>
         <span class="tool-tag" style="background:rgba(188,140,255,.12);color:var(--purple)">Latency</span>
       </a>
 
       <a href="report.html#pnlrace" class="tool-card glass" onclick="navigateTab(event,'pnlrace')">
-        <div class="tool-icon" style="background:rgba(248,81,73,.15);color:var(--red)">&#36;</div>
-        <h3>P&L Race</h3>
-        <p>Each model runs independently with its own random stream. Watch P&L diverge across different random paths.</p>
-        <span class="tool-tag" style="background:rgba(248,81,73,.12);color:var(--red)">Trading</span>
+        <div class="tool-icon" style="background:rgba(248,81,73,.15);color:var(--red)">&#8776;</div>
+        <h3>Outcome Variance</h3>
+        <p>Each model runs independently with its own random stream. Watch value trajectories diverge from identical parameters.</p>
+        <span class="tool-tag" style="background:rgba(248,81,73,.12);color:var(--red)">Stochastic</span>
       </a>
 
       <a href="report.html#perf" class="tool-card glass" onclick="navigateTab(event,'perf')">
@@ -753,6 +818,119 @@ document.addEventListener('mousemove', e => {
   glow.style.left = e.clientX + 'px';
   glow.style.top = e.clientY + 'px';
 });
+
+// ═══ LIVE DEMO ENGINE ═══
+(function(){
+var LEVELS=7,bids={},asks={},trades=[],tradeCount=0;
+
+function init(){
+  bids={};asks={};
+  for(var i=1;i<=LEVELS+2;i++){
+    bids[1000-i]=Math.floor(Math.random()*35)+8;
+    asks[1000+i]=Math.floor(Math.random()*35)+8;
+  }
+}
+
+function bestBid(){
+  var b=-1;for(var p in bids)if(bids[p]>0&&+p>b)b=+p;
+  return b<0?null:b;
+}
+function bestAsk(){
+  var a=1e9;for(var p in asks)if(asks[p]>0&&+p<a)a=+p;
+  return a>1e8?null:a;
+}
+
+function step(){
+  var bb=bestBid(),ba=bestAsk();
+  if(!bb||!ba){init();return;}
+
+  var isBuy=Math.random()<.5,qty=Math.floor(Math.random()*8)+1;
+  var agg=Math.random()<.22;
+
+  if(isBuy&&agg){
+    var rem=qty;
+    while(rem>0){
+      var a=bestAsk();if(!a||!asks[a])break;
+      var fill=Math.min(rem,asks[a]);
+      asks[a]-=fill;if(asks[a]<=0)delete asks[a];
+      rem-=fill;tradeCount++;
+      trades.unshift({s:'BUY',q:fill,p:a});
+      if(trades.length>12)trades.pop();
+    }
+  }else if(!isBuy&&agg){
+    var rem=qty;
+    while(rem>0){
+      var b=bestBid();if(!b||!bids[b])break;
+      var fill=Math.min(rem,bids[b]);
+      bids[b]-=fill;if(bids[b]<=0)delete bids[b];
+      rem-=fill;tradeCount++;
+      trades.unshift({s:'SELL',q:fill,p:b});
+      if(trades.length>12)trades.pop();
+    }
+  }else if(isBuy){
+    var off=Math.floor(Math.random()*3);
+    var price=bb-off;
+    bids[price]=(bids[price]||0)+qty;
+  }else{
+    var off=Math.floor(Math.random()*3);
+    var price=ba+off;
+    asks[price]=(asks[price]||0)+qty;
+  }
+
+  if(Math.random()<.12){
+    var bp=Object.keys(bids).map(Number).sort(function(a,b){return a-b;});
+    if(bp.length>3){var fp=bp[0];bids[fp]-=Math.min(bids[fp],Math.floor(Math.random()*5)+1);if(bids[fp]<=0)delete bids[fp];}
+  }
+  if(Math.random()<.12){
+    var ap=Object.keys(asks).map(Number).sort(function(a,b){return b-a;});
+    if(ap.length>3){var fp=ap[0];asks[fp]-=Math.min(asks[fp],Math.floor(Math.random()*5)+1);if(asks[fp]<=0)delete asks[fp];}
+  }
+
+  var bb2=bestBid(),ba2=bestAsk();
+  if(bb2&&Object.keys(bids).length<4)for(var i=1;i<=3;i++){var pp=bb2-i;if(!bids[pp])bids[pp]=Math.floor(Math.random()*20)+8;}
+  if(ba2&&Object.keys(asks).length<4)for(var i=1;i<=3;i++){var pp=ba2+i;if(!asks[pp])asks[pp]=Math.floor(Math.random()*20)+8;}
+}
+
+function render(){
+  var bb=bestBid(),ba=bestAsk();
+  var spread=(bb&&ba)?ba-bb:'—';
+
+  document.getElementById('demoSpread').textContent=spread;
+  document.getElementById('demoTrades').textContent=tradeCount.toLocaleString();
+  document.getElementById('demoBBO').textContent=(bb||'—')+' / '+(ba||'—');
+
+  var askP=Object.keys(asks).map(Number).sort(function(a,b){return a-b;}).slice(0,LEVELS);
+  var bidP=Object.keys(bids).map(Number).sort(function(a,b){return b-a;}).slice(0,LEVELS);
+  var maxQ=1;
+  for(var i=0;i<askP.length;i++)if(asks[askP[i]]>maxQ)maxQ=asks[askP[i]];
+  for(var i=0;i<bidP.length;i++)if(bids[bidP[i]]>maxQ)maxQ=bids[bidP[i]];
+
+  var h='';
+  for(var i=askP.length-1;i>=0;i--){
+    var p=askP[i],q=asks[p],pct=Math.round((q/maxQ)*100);
+    h+='<div class="demo-ask-row"><span class="dp'+(p===ba?' best':'')+'">'+p+'</span><span class="dq">'+q+'</span><div class="demo-bar-cell"><div class="d-bar ask" style="width:'+pct+'%"></div></div></div>';
+  }
+
+  h+='<div class="demo-spread-row">spread: <span>'+spread+'</span></div>';
+
+  for(var i=0;i<bidP.length;i++){
+    var p=bidP[i],q=bids[p],pct=Math.round((q/maxQ)*100);
+    h+='<div class="demo-bid-row"><span class="dp'+(p===bb?' best':'')+'">'+p+'</span><span class="dq">'+q+'</span><div class="demo-bar-cell"><div class="d-bar bid" style="width:'+pct+'%"></div></div></div>';
+  }
+  document.getElementById('demoBook').innerHTML=h;
+
+  var t='';
+  for(var i=0;i<trades.length;i++){
+    var tr=trades[i];
+    var c=tr.s==='BUY'?'var(--green)':'var(--red)';
+    t+='<div class="demo-trade" style="color:'+c+'"><span style="font-weight:600;display:inline-block;width:32px">'+tr.s+'</span> '+String(tr.q).padStart(2,' ')+' @ '+tr.p+'</div>';
+  }
+  document.getElementById('demoTape').innerHTML=t;
+}
+
+init();
+setInterval(function(){step();step();render();},70);
+})();
 </script>
 </body>
 </html>

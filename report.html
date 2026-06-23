@@ -10,7 +10,10 @@
 .wrap{max-width:1440px;margin:0 auto;padding:16px}
 header{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);margin-bottom:20px}
 header h1{font-size:20px;font-weight:600}
-.tabs{display:flex;gap:4px;background:var(--card);border-radius:8px;padding:4px;margin-bottom:20px;flex-wrap:wrap}
+.tab-groups{display:flex;gap:2px;background:var(--card);border-radius:8px 8px 0 0;padding:4px 4px 0;flex-wrap:wrap}
+.group-btn{padding:7px 18px;border-radius:6px 6px 2px 2px;border:none;background:transparent;color:var(--dim);cursor:pointer;font-size:11px;font-weight:600;transition:all .2s;text-transform:uppercase;letter-spacing:.5px}
+.group-btn:hover{color:var(--text)}.group-btn.active{background:var(--card2);color:var(--text)}
+.tabs{display:flex;gap:4px;background:var(--card);border-radius:0 0 8px 8px;padding:4px;margin-bottom:20px;flex-wrap:wrap;border-top:1px solid var(--border)}
 .tab-btn{padding:7px 16px;border-radius:6px;border:none;background:transparent;color:var(--dim);cursor:pointer;font-size:13px;font-weight:500;transition:all .2s}
 .tab-btn:hover{color:var(--text)}.tab-btn.active{background:var(--blue);color:#fff}
 .tab-content{display:none}.tab-content.active{display:block}
@@ -87,21 +90,16 @@ td{padding:5px 8px;border-bottom:1px solid #21262d}.rt{text-align:right}
 .apanel{overflow:hidden;transition:max-height .3s ease,opacity .2s;max-height:300px;opacity:1}.apanel.shut{max-height:0;opacity:0;padding:0}
 @media(max-width:900px){.grid2,.grid3,.grid4{grid-template-columns:1fr}}
 </style></head><body><div class="wrap">
-<header><a href="index.html" style="color:var(--dim);text-decoration:none;font-size:12px;margin-right:12px;border:1px solid var(--border);padding:4px 12px;border-radius:6px;transition:all .15s" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--dim)'">&larr; Home</a><h1>LOB Matching Engine</h1><span style="color:var(--dim);font-size:12px" id="headerDate"></span><script>document.getElementById('headerDate').textContent=new Date().toISOString().slice(0,10);</script></header><div class="tabs">
-<button class="tab-btn active" onclick="showTab('sim')" data-tab="sim">Solo Simulator</button>
-<button class="tab-btn" onclick="showTab('multi')" data-tab="multi">Latency Race</button>
-<button class="tab-btn" onclick="showTab('pnlrace')" data-tab="pnlrace">P&amp;L Race</button>
-<button class="tab-btn" onclick="showTab('perf')" data-tab="perf">Performance Review</button>
-<button class="tab-btn" onclick="showTab('ref')" data-tab="ref">C++ Reference</button>
-<button class="tab-btn" onclick="showTab('explore')" data-tab="explore">Data Replayer</button>
-<button class="tab-btn" onclick="showTab('dataexp')" data-tab="dataexp">Data Explorer</button>
-<button class="tab-btn" onclick="showTab('feeds')" data-tab="feeds">Live Feeds</button>
-<button class="tab-btn" onclick="showTab('gap')" data-tab="gap">Production Gap</button>
-<button class="tab-btn" onclick="showTab('models')" data-tab="models">Model Deep Dive</button>
-<button class="tab-btn" onclick="showTab('learn')" data-tab="learn">Learn</button>
-<button class="tab-btn" onclick="showTab('linux')" data-tab="linux">Linux Results</button>
-<button class="tab-btn" onclick="showTab('future')" data-tab="future">Future: Client Ecosystem</button>
-</div><div class="tab-content active" id="sim">
+<header><a href="index.html" style="color:var(--dim);text-decoration:none;font-size:12px;margin-right:12px;border:1px solid var(--border);padding:4px 12px;border-radius:6px;transition:all .15s" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--dim)'">&larr; Home</a><h1>LOB Matching Engine</h1><span style="color:var(--dim);font-size:12px" id="headerDate"></span><script>document.getElementById('headerDate').textContent=new Date().toISOString().slice(0,10);</script></header>
+<div style="background:rgba(88,166,255,.06);border:1px solid rgba(88,166,255,.15);border-radius:8px;padding:8px 14px;margin-bottom:14px;font-size:11px;color:var(--dim);line-height:1.5">This is a <b style="color:var(--text)">portfolio project</b> &mdash; a learning-focused implementation of the data structures and techniques used in low-latency matching engines. The browser simulations below use JavaScript models to demonstrate concepts interactively; they do not reflect the C++ engine&rsquo;s actual performance. See the <a href="#" onclick="showTab('linux');return false" style="color:var(--blue)">Linux Results</a> tab for real bare-metal measurements.</div>
+<div class="tab-groups">
+<button class="group-btn active" data-group="simulate" onclick="showGroup('simulate')">Simulate</button>
+<button class="group-btn" data-group="analyze" onclick="showGroup('analyze')">Analyze</button>
+<button class="group-btn" data-group="reference" onclick="showGroup('reference')">Reference</button>
+<button class="group-btn" data-group="data" onclick="showGroup('data')">Data</button>
+<button class="group-btn" data-group="future" onclick="showGroup('future')">Future</button>
+</div>
+<div class="tabs" id="subTabBar"></div><div class="tab-content active" id="sim">
 <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:14px">
 <h3 style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">Solo Simulator</h3>
 <p style="color:var(--dim);font-size:12px;line-height:1.7;margin:0">Run a single order book engine and watch it process orders in real time. Pick an engine model (Optimized, Tree, No Cache, or Naive) and a data source (synthetic random or live Binance crypto). The ladder shows resting bid/ask depth, the tape shows recent trades, and the live metrics track p50/p99 latency and throughput. Use <b style="color:var(--text)">Snapshot</b> to save a run to the Performance Review tab for comparison. Adjust Speed, Aggression, and Cancel rate to stress different code paths.</p>
@@ -194,7 +192,7 @@ td{padding:5px 8px;border-bottom:1px solid #21262d}.rt{text-align:right}
 </div><div class="tab-content" id="multi">
 <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:14px">
 <h3 style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">Latency Race</h3>
-<p style="color:var(--dim);font-size:12px;line-height:1.7;margin:0">Race all four engine models head-to-head on the <b style="color:var(--text)">exact same order stream</b>. Every model processes the same sequence of submits, cancels, and matches &mdash; the only variable is the data structure. p50 and p99 latency charts update live so you can see how direct-indexed arrays compare to tree-based levels, and how BBO caching eliminates linear scans. P&amp;L is identical across models (same fills) &mdash; this tab isolates <b style="color:var(--text)">speed</b>, not trading outcomes.</p>
+<p style="color:var(--dim);font-size:12px;line-height:1.7;margin:0">Race all four engine models head-to-head on the <b style="color:var(--text)">exact same order stream</b>. Every model processes the same sequence of submits, cancels, and matches &mdash; the only variable is the data structure. p50 and p99 latency charts update live so you can see how direct-indexed arrays compare to tree-based levels, and how BBO caching eliminates linear scans. Value is identical across models (same fills) &mdash; this tab isolates <b style="color:var(--text)">speed</b>, not trading outcomes.</p>
 <p style="color:var(--yellow);font-size:11px;line-height:1.5;margin-top:8px"><b>Timing note:</b> Latency is measured with <code style="color:var(--green)">performance.now()</code> in the browser (~5&micro;s resolution). These numbers show <b style="color:var(--text)">relative model differences</b>, not absolute C++ latency. See <b style="color:var(--text)">Linux Results</b> for real <code style="color:var(--green)">rdtscp</code> measurements on bare metal.</p>
 </div>
 <div class="ctrl">
@@ -214,19 +212,19 @@ td{padding:5px 8px;border-bottom:1px solid #21262d}.rt{text-align:right}
 <div class="card"><h2>p50 Latency</h2><canvas id="mP50Chart"></canvas></div>
 <div class="card"><h2>p99 Latency</h2><canvas id="mP99Chart"></canvas></div>
 <div class="card"><h2>Throughput (k ops/s)</h2><canvas id="mThruChart"></canvas></div>
-<div class="card"><h2>Shared P&amp;L ($) <span class="info">i<span class="tip"><b>Why is P&amp;L the same?</b>All four models process the exact same order stream &mdash; same prices, same quantities, same sequence. The only difference is how fast each engine handles them. Identical P&amp;L confirms the models are functionally equivalent. See the P&amp;L Race tab for independent runs.<em>This tab isolates latency, not trading outcomes.</em></span></span></h2><canvas id="mPnlChart"></canvas></div>
+<div class="card"><h2>Shared Value <span class="info">i<span class="tip"><b>Why is the value identical?</b>All four models process the exact same order stream &mdash; same prices, same quantities, same sequence. The only difference is how fast each engine handles them. Identical accumulated value confirms the models are functionally equivalent. See the Outcome Variance tab for independent runs.<em>This tab isolates latency, not outcomes.</em></span></span></h2><canvas id="mPnlChart"></canvas></div>
 </div></div>
-<!-- ═══ P&L RACE TAB ═══ -->
+<!-- ═══ OUTCOME VARIANCE TAB ═══ -->
 <div class="tab-content" id="pnlrace">
 <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:14px">
-<h3 style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">P&amp;L Race</h3>
-<p style="color:var(--dim);font-size:12px;line-height:1.7;margin:0">Unlike Latency Race (shared stream), here each model generates its <b style="color:var(--text)">own independent random orders</b> from the same parameters but different seeds. P&amp;L diverges across models &mdash; not because of data structure differences, but because each model walks a different random path. This demonstrates how <b style="color:var(--text)">randomness alone drives outcome variance</b> even when parameters are identical. Compare trajectories to see the range of possible outcomes from the same strategy.</p>
+<h3 style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">Outcome Variance</h3>
+<p style="color:var(--dim);font-size:12px;line-height:1.7;margin:0">Each model generates its <b style="color:var(--text)">own independent random orders</b> from the same parameters but different seeds. The resulting value trajectories diverge &mdash; not because of engine differences, but because each walks a different random path. <b style="color:var(--text)">Latency Race</b> (shared stream) proves functional equivalence; this tab isolates how identical parameters produce different outcomes when randomness differs. This is the same stochastic variance that makes backtesting unreliable without Monte Carlo analysis.</p>
 </div>
 <div class="ctrl">
 <button id="prPlayBtn" onclick="togglePnlRace()">&#9654; Start Race</button>
 <button onclick="resetPnlRace()">&#8635; Reset</button>
-<button onclick="snapshotPnlRace()" style="border-color:var(--purple);color:var(--purple)" title="Capture current P&L race stats and save to Performance Review tab">Snapshot</button>
-<div class="sg"><label>Data <span class="info">i<span class="tip" style="width:280px"><b>Independent runs</b>Unlike Latency Race (where all models share one order stream), here each model generates its own random orders from scratch. Same speed/aggression/cancel parameters but different random seeds &mdash; so each model sees a different &ldquo;market.&rdquo; P&amp;L diverges because of the different random paths, not because of data structure choices. This demonstrates how randomness alone drives outcome variance.<em>Compare P&amp;L trajectories to see the range of possible outcomes from identical parameters.</em></span></span></label><select id="prScenSel" onchange="setPnlRaceData(this.value)">
+<button onclick="snapshotPnlRace()" style="border-color:var(--purple);color:var(--purple)" title="Capture current race stats and save to Performance Review tab">Snapshot</button>
+<div class="sg"><label>Data <span class="info">i<span class="tip" style="width:280px"><b>Independent runs</b>Unlike Latency Race (where all models share one order stream), here each model generates its own random orders from scratch. Same speed/aggression/cancel parameters but different random seeds &mdash; so each model sees a different sequence. Value diverges because of the different random paths, not because of data structure choices.<em>Compare trajectories to see the range of outcomes from identical parameters.</em></span></span></label><select id="prScenSel" onchange="setPnlRaceData(this.value)">
 <option value="steady">Steady</option><option value="sweep">Sweep</option>
 <option value="stress">Stress</option><option value="wide">Wide</option>
 <option value="crypto:bitcoin">BTC (Bitcoin)</option><option value="crypto:ethereum">ETH (Ethereum)</option>
@@ -238,7 +236,7 @@ td{padding:5px 8px;border-bottom:1px solid #21262d}.rt{text-align:right}
 </div>
 <div id="pnlRaceStats"></div>
 <div class="grid2" id="pnlRaceChartArea">
-<div class="card"><h2>P&amp;L Over Time ($)</h2><canvas id="prPnlChart"></canvas></div>
+<div class="card"><h2>Accumulated Value (ticks)</h2><canvas id="prPnlChart"></canvas></div>
 <div class="card"><h2>Cumulative Volume</h2><canvas id="prVolChart"></canvas></div>
 <div class="card"><h2>Trade Count</h2><canvas id="prTradeChart"></canvas></div>
 <div class="card"><h2>p50 Latency</h2><canvas id="prLatChart"></canvas></div>
@@ -272,14 +270,14 @@ td{padding:5px 8px;border-bottom:1px solid #21262d}.rt{text-align:right}
 </div><div class="tab-content" id="ref">
 <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:14px">
 <h3 style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">C++ Reference</h3>
-<p style="color:var(--dim);font-size:12px;line-height:1.7;margin:0">The architecture and real latency numbers for the <b style="color:var(--text)">production C++ engine</b> &mdash; not the JavaScript simulation models. The pipeline diagram shows the SPSC ring-buffer architecture (ingest &rarr; matching core &rarr; publisher). Latency cards will be filled from a controlled bare-metal Linux run; until then they show &ldquo;tbd&rdquo; because fabricated numbers are worse than no numbers. See <b style="color:var(--text)">Linux Results</b> for reproduction steps.</p>
+<p style="color:var(--dim);font-size:12px;line-height:1.7;margin:0">The architecture and real latency numbers for the <b style="color:var(--text)">C++ engine</b> &mdash; not the JavaScript simulation models. The pipeline diagram shows the SPSC ring-buffer architecture (ingest &rarr; matching core &rarr; publisher). Latency numbers are from a controlled bare-metal Linux run with <code style="color:var(--green)">rdtscp</code> timing. See <b style="color:var(--text)">Linux Results</b> for full methodology and reproduction steps.</p>
 </div>
 <div class="metrics">
-<div class="metric"><div class="v g">tbd</div><div class="l">C++ p50</div></div>
-<div class="metric"><div class="v y">tbd</div><div class="l">C++ p99</div></div>
-<div class="metric"><div class="v r">tbd</div><div class="l">C++ p99.9</div></div>
-<div class="metric"><div class="v b">tbd</div><div class="l">C++ ops/s</div></div></div>
-<div style="text-align:center;padding:8px;font-size:11px;color:var(--dim);background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:14px">C++ bare-metal results: <b style="color:var(--green)">48ns</b> p50 submit, <b style="color:var(--green)">78ns</b> p50 match, <b style="color:var(--green)">100ns</b> p50 cancel (AWS c5.metal). Full breakdown in the <a href="#" onclick="showTab('linux');return false" style="color:var(--blue)">Linux Results</a> tab.</div>
+<div class="metric"><div class="v g">48 ns</div><div class="l">Submit p50</div></div>
+<div class="metric"><div class="v g">78 ns</div><div class="l">Match p50</div></div>
+<div class="metric"><div class="v y">144 ns</div><div class="l">Match p99</div></div>
+<div class="metric"><div class="v b">100 ns</div><div class="l">Cancel p50</div></div></div>
+<div style="text-align:center;padding:8px;font-size:11px;color:var(--dim);background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:14px">AWS c5.metal bare metal, <code style="color:var(--green)">rdtscp</code> timing, isolated core, 500K ops measured. Full breakdown in the <a href="#" onclick="showTab('linux');return false" style="color:var(--blue)">Linux Results</a> tab.</div>
 <div class="card"><h2>Architecture</h2><div class="arch">
 <div class="arch-box">Market Data<span class="arch-label">in</span></div><div class="arch-arrow">&rarr;</div>
 <div class="arch-box" style="border-color:var(--blue)">SPSC Queue<span class="arch-label">lock-free</span></div><div class="arch-arrow">&rarr;</div>
@@ -400,7 +398,7 @@ td{padding:5px 8px;border-bottom:1px solid #21262d}.rt{text-align:right}
 </div><div class="tab-content" id="gap">
 <div style="max-width:960px;margin:0 auto">
 <div style="margin-bottom:24px"><h1 style="font-size:20px;font-weight:600;margin-bottom:6px">This Engine vs. Production</h1>
-<p style="color:var(--dim);font-size:13px;line-height:1.6;margin:0">An honest assessment of what this matching engine shares with production exchange infrastructure and what a real system requires on top. The core matching logic is production-grade; the surrounding infrastructure is where the gap lives.</p></div>
+<p style="color:var(--dim);font-size:13px;line-height:1.6;margin:0">An honest assessment of what this matching engine shares with production exchange infrastructure and what a real system requires on top. The core matching logic follows the same patterns used in production exchange software; the surrounding infrastructure is where the gap lives.</p></div>
 
 <div class="gap-sec"><h2><span style="color:var(--green)">&#10003;</span> What This Engine Gets Right <span class="badge" style="background:#3fb95022;color:var(--green)">Shared with production</span></h2>
 <div class="card">
@@ -463,7 +461,7 @@ td{padding:5px 8px;border-bottom:1px solid #21262d}.rt{text-align:right}
 
 <div class="card" style="border-top:3px solid #3fb950;margin-bottom:16px">
 <h2 style="display:flex;align-items:center;gap:8px"><span style="color:#3fb950">&#9632;</span> Optimized Book <span class="str-w str-pro">BASELINE</span></h2>
-<p style="color:var(--dim);font-size:12px;line-height:1.6;margin:0 0 12px">The production-grade implementation. The C++ engine uses a <b style="color:var(--text)">direct-indexed array</b> (levels[tick]) for true O(1) level access with no hashing overhead. Cached BBO, no tree rebalancing. Below is the JavaScript simulation model used in this dashboard; the C++ source in <code style="color:var(--green)">include/lob/order_book.hpp</code> uses the array approach.</p>
+<p style="color:var(--dim);font-size:12px;line-height:1.6;margin:0 0 12px">The fully optimized implementation. The C++ engine uses a <b style="color:var(--text)">direct-indexed array</b> (levels[tick]) for true O(1) level access with no hashing overhead. Cached BBO, no tree rebalancing. Below is the JavaScript simulation model used in this dashboard; the C++ source in <code style="color:var(--green)">include/lob/order_book.hpp</code> uses the array approach.</p>
 <div class="mdl-grid">
 <div><h3 style="font-size:12px;color:var(--dim);margin-bottom:6px">Strengths</h3>
 <span class="str-w str-pro">O(1) submit</span><span class="str-w str-pro">O(1) cancel</span><span class="str-w str-pro">O(1) BBO lookup</span><span class="str-w str-pro">Cache-friendly</span><span class="str-w str-pro">No rebalancing</span></div>
@@ -877,7 +875,7 @@ td{padding:5px 8px;border-bottom:1px solid #21262d}.rt{text-align:right}
 <div id="learnTool" style="display:none">
 <div class="card">
 <h2>About This Engine</h2>
-<p style="color:var(--dim);font-size:13px;line-height:1.8;margin-bottom:16px">This is a <b style="color:var(--text)">single-threaded, allocation-free limit order book and matching engine</b> written in C++20. It was built to demonstrate low-latency systems engineering at a depth that an HFT or infrastructure engineer would recognize as production-grade methodology &mdash; not a toy.</p>
+<p style="color:var(--dim);font-size:13px;line-height:1.8;margin-bottom:16px">This is a <b style="color:var(--text)">single-threaded, allocation-free limit order book and matching engine</b> written in C++20. It was built to demonstrate the data-structure and systems-engineering techniques that real exchange matching engines use &mdash; O(1) data structures, zero allocation, cache-friendly layout, cycle-accurate measurement.</p>
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
 <div style="background:var(--card2);border-radius:8px;padding:14px">
@@ -930,7 +928,7 @@ td{padding:5px 8px;border-bottom:1px solid #21262d}.rt{text-align:right}
 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
 <div style="background:var(--card2);border-radius:8px;padding:14px">
 <h3 style="font-size:13px;color:var(--green);margin-bottom:6px">OrderBook</h3>
-<p style="color:var(--dim);font-size:11px;line-height:1.6">The production-grade implementation. Direct-indexed array, LIFO pool, BBO cache. This is the one you&rsquo;d deploy.</p>
+<p style="color:var(--dim);font-size:11px;line-height:1.6">The fully optimized implementation. Direct-indexed array, LIFO pool, BBO cache. This is the baseline all ablation variants are measured against.</p>
 </div>
 <div style="background:var(--card2);border-radius:8px;padding:14px">
 <h3 style="font-size:13px;color:var(--purple);margin-bottom:6px">PhotonBook</h3>
@@ -1134,91 +1132,32 @@ td{padding:5px 8px;border-bottom:1px solid #21262d}.rt{text-align:right}
 </div>
 
 <div class="card">
-<h2>Mock Client Gateway</h2>
-<p style="color:var(--dim);font-size:12px;line-height:1.8;margin-bottom:12px">A logical next step is building a <b style="color:var(--text)">mock Python/C++ client gateway</b> that simulates realistic trading client behavior against the matching engine:</p>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-<div style="background:var(--card2);border-radius:8px;padding:14px">
-<h3 style="font-size:13px;color:var(--green);margin-bottom:8px">What It Would Do</h3>
-<ul style="color:var(--dim);font-size:12px;line-height:2;padding-left:16px">
-<li>Connect to the engine via SPSC or TCP</li>
-<li>Submit orders as different &ldquo;firms&rdquo; with unique OwnerIds</li>
-<li>Simulate toxic flow (informed trading) vs. noise flow</li>
-<li>Run market-making strategies against itself</li>
-<li>Generate realistic STP (self-trade prevention) scenarios</li>
-<li>Measure end-to-end latency from order submission to fill confirmation</li>
-</ul>
-</div>
-<div style="background:var(--card2);border-radius:8px;padding:14px">
-<h3 style="font-size:13px;color:var(--blue);margin-bottom:8px">Why It Matters</h3>
-<ul style="color:var(--dim);font-size:12px;line-height:2;padding-left:16px">
-<li>Proves the engine handles concurrent multi-firm workloads</li>
-<li>Tests STP under realistic conditions (not just unit tests)</li>
-<li>Demonstrates understanding of the full exchange stack</li>
-<li>Shows clear architectural separation: engine vs. client</li>
-<li>Provides realistic load for tail-latency analysis</li>
-<li>Framework for implementing actual trading strategies</li>
-</ul>
-</div>
-</div>
-</div>
-
-<div class="card">
-<h2>Trading Algorithms: What Clients Would Run</h2>
-<p style="color:var(--dim);font-size:12px;line-height:1.8;margin-bottom:14px">These are the algorithms that would run <b style="color:var(--text)">as clients of</b> this matching engine. They are explicitly <b style="color:var(--text)">not part of the engine itself</b> &mdash; the engine is infrastructure, neutral to all participants.</p>
+<h2>Areas to Explore Next</h2>
+<p style="color:var(--dim);font-size:12px;line-height:1.8;margin-bottom:14px">None of these are implemented &mdash; they represent the natural next steps if this project were extended into a full exchange simulation. Each would run <b style="color:var(--text)">as a client of</b> the matching engine, not inside it.</p>
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
-
-<div style="background:var(--card2);border:1px solid rgba(210,153,34,.2);border-radius:8px;padding:14px">
-<h3 style="font-size:14px;color:var(--yellow);margin-bottom:8px">Avellaneda-Stoikov Market Making</h3>
-<p style="color:var(--dim);font-size:11px;line-height:1.6;margin-bottom:8px">The canonical quant market-making model. Sets bid and ask quotes around a reservation price that accounts for inventory risk and volatility. The spread quoted is a function of risk aversion and remaining time in the trading session.</p>
-<div style="font-family:'SF Mono',Consolas,monospace;font-size:10px;color:var(--dim);background:#0d1117;border-radius:6px;padding:8px;line-height:1.6">
-<div><span style="color:var(--blue)">reservation_price</span> = mid - q * gamma * sigma^2 * T</div>
-<div><span style="color:var(--blue)">optimal_spread</span> = gamma * sigma^2 * T + (2/gamma) * ln(1 + gamma/k)</div>
-<div><span style="color:var(--dim)">where q=inventory, gamma=risk_aversion, T=time_remaining, k=order_arrival_intensity</span></div>
+<div style="background:var(--card2);border-radius:8px;padding:14px">
+<h3 style="font-size:13px;color:var(--purple);margin-bottom:8px">Client Gateway</h3>
+<p style="color:var(--dim);font-size:11px;line-height:1.7">A mock gateway that connects to the engine via SPSC or TCP, submits orders as different firms with unique OwnerIds, and measures end-to-end latency from submission to fill confirmation. Would exercise STP under realistic multi-participant workloads.</p>
 </div>
+<div style="background:var(--card2);border-radius:8px;padding:14px">
+<h3 style="font-size:13px;color:var(--yellow);margin-bottom:8px">Market Making Client</h3>
+<p style="color:var(--dim);font-size:11px;line-height:1.7">An inventory-aware quoting strategy (e.g. Avellaneda-Stoikov) that manages bid/ask placement and risk. Would demonstrate the kind of latency-sensitive client the engine is designed to serve.</p>
 </div>
-
-<div style="background:var(--card2);border:1px solid rgba(86,212,221,.2);border-radius:8px;padding:14px">
-<h3 style="font-size:14px;color:var(--cyan);margin-bottom:8px">Smart Order Router (SOR)</h3>
-<p style="color:var(--dim);font-size:11px;line-height:1.6;margin-bottom:8px">In multi-venue markets, a SOR splits a parent order across exchanges to minimize market impact and comply with Reg NMS best-execution requirements. Needs real-time consolidated book view.</p>
-<div style="font-family:'SF Mono',Consolas,monospace;font-size:10px;color:var(--dim);background:#0d1117;border-radius:6px;padding:8px;line-height:1.6">
-<div><span style="color:var(--blue)">for each venue in sorted_by_price:</span></div>
-<div>&nbsp;&nbsp;<span style="color:var(--blue)">allocate</span> = min(remaining, venue.available)</div>
-<div>&nbsp;&nbsp;send IOC(venue, allocate)</div>
-<div>&nbsp;&nbsp;remaining -= allocate</div>
+<div style="background:var(--card2);border-radius:8px;padding:14px">
+<h3 style="font-size:13px;color:var(--green);margin-bottom:8px">Execution Algorithms</h3>
+<p style="color:var(--dim);font-size:11px;line-height:1.7">TWAP/VWAP slicing, smart order routing across simulated venues. Would test the engine under rapid bursts of IOC child orders and demonstrate multi-venue integration.</p>
 </div>
-</div>
-
-<div style="background:var(--card2);border:1px solid rgba(63,185,80,.2);border-radius:8px;padding:14px">
-<h3 style="font-size:14px;color:var(--green);margin-bottom:8px">TWAP / VWAP Execution</h3>
-<p style="color:var(--dim);font-size:11px;line-height:1.6;margin-bottom:8px">Slice large orders into child orders spread across time (TWAP) or volume (VWAP) to minimize market impact. The matching engine handles rapid bursts of limit/IOC child orders.</p>
-<div style="font-family:'SF Mono',Consolas,monospace;font-size:10px;color:var(--dim);background:#0d1117;border-radius:6px;padding:8px;line-height:1.6">
-<div><span style="color:var(--blue)">TWAP</span>: qty_per_slice = total / num_intervals</div>
-<div><span style="color:var(--blue)">VWAP</span>: qty_per_slice = total * (hist_vol_pct[i])</div>
-<div><span style="color:var(--dim)">Submit as limit orders with price = mid +/- buffer</span></div>
-</div>
-</div>
-
-<div style="background:var(--card2);border:1px solid rgba(248,81,73,.2);border-radius:8px;padding:14px">
-<h3 style="font-size:14px;color:var(--red);margin-bottom:8px">Toxic Flow / Sniper Detection</h3>
-<p style="color:var(--dim);font-size:11px;line-height:1.6;margin-bottom:8px">Detect when incoming flow is &ldquo;informed&rdquo; (adverse selection) by monitoring fill-to-fade rates, IOC ratios, and aggression patterns. The engine&rsquo;s lifecycle events (Ack/Fill/Cancel) provide the data for this analysis.</p>
-<div style="font-family:'SF Mono',Consolas,monospace;font-size:10px;color:var(--dim);background:#0d1117;border-radius:6px;padding:8px;line-height:1.6">
-<div><span style="color:var(--blue)">toxicity_score</span> = fills_that_faded / total_fills</div>
-<div><span style="color:var(--blue)">if</span> toxicity &gt; threshold: widen_spread(owner_id)</div>
-<div><span style="color:var(--dim)">Requires: per-client fill tracking + mid-price monitoring</span></div>
-</div>
+<div style="background:var(--card2);border-radius:8px;padding:14px">
+<h3 style="font-size:13px;color:var(--red);margin-bottom:8px">Flow Analysis</h3>
+<p style="color:var(--dim);font-size:11px;line-height:1.7">Adverse selection and toxicity detection using the engine&rsquo;s lifecycle events (Ack/Fill/Cancel). Would monitor fill-to-fade rates per client to distinguish informed from uninformed order flow.</p>
 </div>
 </div>
 </div>
 
 <div class="card" style="background:#21262d;text-align:center;padding:24px">
 <p style="font-size:14px;color:var(--text);margin:0 0 10px;font-weight:600">Separation of Concerns</p>
-<p style="font-size:12px;color:var(--dim);margin:0 0 12px">The matching engine is the <b style="color:var(--green)">neutral infrastructure</b>. Trading algorithms are <b style="color:var(--yellow)">opinionated clients</b>. Mixing them is an architectural mistake that production systems never make.</p>
-<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-<span style="display:inline-block;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:600;background:rgba(63,185,80,.15);color:var(--green);border:1px solid rgba(63,185,80,.3)">Engine = Infrastructure</span>
-<span style="display:inline-block;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:600;background:rgba(210,153,34,.15);color:var(--yellow);border:1px solid rgba(210,153,34,.3)">Algos = Clients</span>
-<span style="display:inline-block;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:600;background:rgba(188,140,255,.15);color:var(--purple);border:1px solid rgba(188,140,255,.3)">Gateway = Boundary</span>
-</div>
+<p style="font-size:12px;color:var(--dim);margin:0">The matching engine is <b style="color:var(--green)">neutral infrastructure</b>. Trading algorithms are <b style="color:var(--yellow)">opinionated clients</b>. Keeping them separate is deliberate &mdash; the engine serves all participants equally, and the architecture reflects that.</p>
 </div>
 
 </div>
@@ -1226,13 +1165,26 @@ td{padding:5px 8px;border-bottom:1px solid #21262d}.rt{text-align:right}
 <script>
 Chart.defaults.color='#8b949e';Chart.defaults.borderColor='#21262d';
 // Histogram placeholder — will be populated from real bare-metal benchmark data
-document.getElementById('refH').parentElement.innerHTML='<div style="text-align:center;padding:40px 0;color:var(--dim);font-size:12px">Latency histogram will appear here after pasting benchmark output in the <a href="#" onclick="showTab(\'linux\');return false" style="color:var(--blue)">Linux Results</a> tab.</div>';
+document.getElementById('refH').parentElement.innerHTML='<div style="text-align:center;padding:40px 0;color:var(--dim);font-size:12px">Full latency distribution available in the <a href="#" onclick="showTab(\'linux\');return false" style="color:var(--blue)">Linux Results</a> tab. Paste your own <code style="color:var(--green)">lob_bench</code> output there to generate histograms.</div>';
 
-const TAB_NAMES={sim:'Solo Simulator',multi:'Latency Race',pnlrace:'P&L Race',perf:'Performance Review',ref:'C++ Reference',explore:'Data Replayer',dataexp:'Data Explorer',feeds:'Live Feeds',gap:'Production Gap',models:'Model Deep Dive',learn:'Learn',linux:'Linux Results',future:'Client Ecosystem'};
-function showTab(id){document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
-document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active'));
-document.getElementById(id).classList.add('active');document.querySelector('[data-tab="'+id+'"]').classList.add('active');
-document.title='LOB Engine — '+(TAB_NAMES[id]||'Dashboard');}
+const TAB_NAMES={sim:'Solo Simulator',multi:'Latency Race',pnlrace:'Outcome Variance',perf:'Performance Review',ref:'C++ Reference',explore:'Data Replayer',dataexp:'Data Explorer',feeds:'Live Feeds',gap:'Production Gap',models:'Model Deep Dive',learn:'Learn',linux:'Linux Results',future:'Client Ecosystem'};
+const TAB_GROUPS={
+simulate:{tabs:['sim','multi','pnlrace'],names:['Solo Simulator','Latency Race','Outcome Variance']},
+analyze:{tabs:['models','linux','perf'],names:['Model Deep Dive','Linux Results','Performance Review']},
+reference:{tabs:['ref','gap','learn'],names:['C++ Reference','Production Gap','Learn']},
+data:{tabs:['dataexp','explore','feeds'],names:['Data Explorer','Data Replayer','Live Feeds']},
+future:{tabs:['future'],names:['Client Ecosystem']}};
+const TAB_TO_GROUP={};for(const[g,info]of Object.entries(TAB_GROUPS))for(const t of info.tabs)TAB_TO_GROUP[t]=g;
+function showGroup(g,tabOverride){
+document.querySelectorAll('.group-btn').forEach(b=>b.classList.remove('active'));
+var gb=document.querySelector('[data-group="'+g+'"]');if(gb)gb.classList.add('active');
+var info=TAB_GROUPS[g],active=tabOverride||info.tabs[0];
+var bar=document.getElementById('subTabBar');
+bar.innerHTML=info.tabs.map(function(t,i){return'<button class="tab-btn'+(t===active?' active':'')+'" data-tab="'+t+'" onclick="showTab(\''+t+'\')">'+info.names[i]+'</button>';}).join('');
+document.querySelectorAll('.tab-content').forEach(function(e){e.classList.remove('active');});
+document.getElementById(active).classList.add('active');
+document.title='LOB Engine — '+(TAB_NAMES[active]||'Dashboard');}
+function showTab(id){var g=TAB_TO_GROUP[id];if(g)showGroup(g,id);}
 function showPerfView(v){document.getElementById('perfSolo').style.display=v==='solo'?'block':'none';
 document.getElementById('perfMulti').style.display=v==='multi'?'block':'none';
 document.getElementById('perfSoloBtn').classList.toggle('active',v==='solo');
@@ -1541,7 +1493,7 @@ document.getElementById('mPlayBtn').innerHTML='&#9654; Start Race';document.getE
 for(const m of['p50','p99','thru','pnl'])for(const k of MK)mData[m][k]=[];
 for(const c of Object.values(mCharts))c.destroy();
 mCharts.p50=makeMultiChart('mP50Chart','p50','µs');mCharts.p99=makeMultiChart('mP99Chart','p99','µs');
-mCharts.thru=makeMultiChart('mThruChart','Throughput','k ops/s');mCharts.pnl=makeMultiChart('mPnlChart','P&L','$');
+mCharts.thru=makeMultiChart('mThruChart','Throughput','k ops/s');mCharts.pnl=makeMultiChart('mPnlChart','Value','ticks');
 renderMulti();}
 function setMultiData(v){if(v.startsWith('crypto:')){startMultiCrypto(v.split(':')[1]);}else{if(mCryptoFeed){mCryptoFeed.stop();mCryptoFeed=null;}multiScen=v;}}
 async function startMultiCrypto(coin){resetMulti();mCryptoFeed=new CryptoFeed();
@@ -1581,7 +1533,7 @@ h+='<div class="mv">'+mBooks[k].orderCount()+'</div><div class="ml">Orders</div>
 h+='<div class="mv">'+mBooks[k].mc+'</div><div class="ml">Trades</div></div>';}
 h+='</div>';
 const shPnl=mPnls.optimized;const shPv=shPnl.total(mMid);
-h+='<div style="text-align:center;padding:6px 0;font-size:13px;color:var(--dim)">Shared P&L: <span class="'+(shPv>=0?'pnl-pos':'pnl-neg')+'" style="font-weight:700;font-size:15px">$'+shPnl.fmt(mMid)+'</span> &nbsp;&middot;&nbsp; Volume: '+shPnl.vol.toLocaleString()+'</div>';
+h+='<div style="text-align:center;padding:6px 0;font-size:13px;color:var(--dim)">Shared Value: <span class="'+(shPv>=0?'pnl-pos':'pnl-neg')+'" style="font-weight:700;font-size:15px">'+shPnl.fmt(mMid)+' ticks</span> &nbsp;&middot;&nbsp; Volume: '+shPnl.vol.toLocaleString()+'</div>';
 document.getElementById('multiStats').innerHTML=h;
 if(mFrame%20===0&&mData.p50.optimized.length>1){const labels=Array.from({length:mData.p50.optimized.length},(_,i)=>i);
 for(const[m,ch]of Object.entries(mCharts)){ch.data.labels=labels;
@@ -1605,7 +1557,7 @@ for(const k of MK){prBooks[k]=new(MODELS[k])();prPerfs[k]=new PT();prPnls[k]=new
 document.getElementById('prPlayBtn').innerHTML='&#9654; Start Race';document.getElementById('prPlayBtn').classList.remove('on');
 for(const m of['pnl','vol','trades','lat'])for(const k of MK)prData[m][k]=[];
 for(const c of Object.values(prCharts))c.destroy();
-prCharts.pnl=makePrChart('prPnlChart','P&L','$');prCharts.vol=makePrChart('prVolChart','Volume','units');
+prCharts.pnl=makePrChart('prPnlChart','Value','ticks');prCharts.vol=makePrChart('prVolChart','Volume','units');
 prCharts.trades=makePrChart('prTradeChart','Trades','count');prCharts.lat=makePrChart('prLatChart','p50','µs');
 renderPnlRace();}
 
@@ -1657,7 +1609,7 @@ function renderPnlRace(){
 let h='<div class="grid4">';
 for(const k of MK){const pn=prPnls[k];const pv=pn.total(prMids[k]);
 h+='<div class="mcard" style="border-top:3px solid '+MC[k]+'"><h3>'+MN[k]+'</h3>';
-h+='<div class="mv '+(pv>=0?'pnl-pos':'pnl-neg')+'">$'+pn.fmt(prMids[k])+'</div><div class="ml">P&L</div>';
+h+='<div class="mv '+(pv>=0?'pnl-pos':'pnl-neg')+'">'+pn.fmt(prMids[k])+'</div><div class="ml">Value (ticks)</div>';
 h+='<div class="mv">'+pn.vol.toLocaleString()+'</div><div class="ml">Volume</div>';
 h+='<div class="mv">'+pn.trades.toLocaleString()+'</div><div class="ml">Trades</div>';
 h+='<div class="mv g">'+prPerfs[k].pct(50).toFixed(1)+'</div><div class="ml">p50 µs</div></div>';}
@@ -2100,6 +2052,7 @@ animate();buildFeedGrid();
   var lv=sessionStorage.getItem('lob_learn_view');
   if(t){sessionStorage.removeItem('lob_tab');sessionStorage.removeItem('lob_learn_view');showTab(t);if(lv&&typeof showLearnView==='function')showLearnView(lv);return;}
   var h=location.hash.replace('#','');
-  if(h&&document.getElementById(h))showTab(h);
+  if(h&&document.getElementById(h)){showTab(h);return;}
+  showGroup('simulate');
 })();
 </script></div></body></html>
