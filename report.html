@@ -1336,7 +1336,7 @@ function logExpTrade(tr){if(expPaused)return;expTrades.push({price:tr.price,qty:
 
 // ========= SOLO SIMULATOR =========
 let curModel='optimized',simBook=new OptimizedBook(),perf=new PT(),pnl=new PnL();
-let simOn=false,simScen='steady',simFrame=0,live=[],simMid=1000,opsT=0;
+let simOn=false,simScen='steady',simFrame=0,live=[],simMid=1000,opsT=0,lastTapeLen=0;
 let soloHist=[],multiHist=[];let psHC=null,psOC=null;
 let cryptoFeed=null,cryptoLevelMap={};
 const CRYPTO_PAIRS={bitcoin:'BTCUSDT',ethereum:'ETHUSDT',solana:'SOLUSDT',dogecoin:'DOGEUSDT',ripple:'XRPUSDT'};
@@ -1346,7 +1346,7 @@ const A_MAX=300;
 
 function switchModel(m){curModel=m;resetSim();document.getElementById('mTag').textContent=MN[m];document.getElementById('mTag').style.background=MC[m];}
 function toggleSim(){simOn=!simOn;const b=document.getElementById('playBtn');b.innerHTML=simOn?'&#9646;&#9646; Pause':'&#9654; Start';b.classList.toggle('on',simOn);}
-function resetSim(){simOn=false;if(cryptoFeed){cryptoFeed.stop();cryptoFeed=null;}cryptoLevelMap={};expEvents=[];expRaw=[];expTrades=[];if(expDepthChart){expDepthChart.destroy();expDepthChart=null;}simBook=new(MODELS[curModel])();perf=new PT();pnl=new PnL();live=[];simMid=1000;opsT=0;simFrame=0;
+function resetSim(){simOn=false;if(cryptoFeed){cryptoFeed.stop();cryptoFeed=null;}cryptoLevelMap={};expEvents=[];expRaw=[];expTrades=[];if(expDepthChart){expDepthChart.destroy();expDepthChart=null;}simBook=new(MODELS[curModel])();perf=new PT();pnl=new PnL();live=[];simMid=1000;opsT=0;simFrame=0;lastTapeLen=0;document.getElementById('tape').innerHTML='';
 soloPnlData=[];if(soloPnlChart){soloPnlChart.destroy();soloPnlChart=null;}
 aData={mid:[],spread:[],imbal:[],vol:[],eps:[],fps:[]};aVolAcc=0;aEpsAcc=0;aFpsAcc=0;aLastSample=performance.now();
 for(const c of[aMidCh,aSpreadCh,aImbalCh,aVolCh,aThruCh]){if(c)c.destroy();}aMidCh=aSpreadCh=aImbalCh=aVolCh=aThruCh=null;
@@ -1439,9 +1439,16 @@ el.innerHTML=h;}
 
 function renderSolo(){
 renderLadder(simBook,simMid,document.getElementById('ladder'));
-const last=simBook.trades.slice(-14).reverse();let tp='';
-for(const t of last)tp+='<div class="trade-row '+(t.side==='buy'?'trade-buy':'trade-sell')+'">'+(t.side==='buy'?'BUY ':'SELL')+' '+t.qty+' @ '+t.price+'</div>';
-document.getElementById('tape').innerHTML=tp;
+if(simBook.trades.length!==lastTapeLen){
+var tapeEl=document.getElementById('tape'),newCount=simBook.trades.length-lastTapeLen;
+lastTapeLen=simBook.trades.length;
+if(newCount<0||newCount>100){tapeEl.innerHTML='';newCount=Math.min(simBook.trades.length,14);}
+var fresh=simBook.trades.slice(-newCount);
+for(var ti=fresh.length-1;ti>=0;ti--){var t=fresh[ti];var d=document.createElement('div');
+d.className='trade-row '+(t.side==='buy'?'trade-buy':'trade-sell');
+d.textContent=(t.side==='buy'?'BUY ':'SELL')+' '+t.qty+' @ '+t.price;
+tapeEl.insertBefore(d,tapeEl.firstChild);}
+while(tapeEl.children.length>14)tapeEl.removeChild(tapeEl.lastChild);}
 const spr=(simBook.bestBid()!==null&&simBook.bestAsk()!==null)?simBook.bestAsk()-simBook.bestBid():'--';
 let st='Orders: <b>'+simBook.orderCount()+'</b><br>Trades: <b>'+simBook.mc+'</b><br>Spread: <b>'+spr+'</b><br>Ops: <b>'+opsT.toLocaleString()+'</b>';
 if(cryptoFeed&&cryptoFeed.connected)st+='<br><span style="color:var(--green)">&#9679; LIVE</span> <span style="color:var(--dim)">'+cryptoFeed.pair+'</span>';

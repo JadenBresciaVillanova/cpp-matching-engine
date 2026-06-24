@@ -396,11 +396,13 @@ details summary::-webkit-details-marker{display:none}
 .demo-tape-wrap{border-left:1px solid rgba(255,255,255,.06);padding:10px 16px;font-family:'SF Mono',Consolas,monospace;font-size:11px;display:flex;flex-direction:column}
 .demo-tape-title{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);font-weight:600;margin-bottom:6px}
 .demo-tape{flex:1;overflow:hidden}
-.demo-trade{padding:2px 0;line-height:1.6;opacity:0;animation:dtFade .25s forwards}
+.demo-trade{padding:2px 0;line-height:1.6;opacity:0;animation:dtFade .08s forwards}
 @keyframes dtFade{to{opacity:1}}
-.demo-footer{padding:10px 20px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--dim)}
-.demo-footer a{color:var(--blue);text-decoration:none;font-weight:600;font-size:12px;transition:opacity .2s}
+.demo-footer{padding:10px 20px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:11px;color:var(--dim)}
+.demo-footer a{color:var(--blue);text-decoration:none;font-weight:600;font-size:12px;transition:opacity .2s;white-space:nowrap}
 .demo-footer a:hover{opacity:.8}
+.demo-speed{display:flex;align-items:center;gap:6px;font-family:'SF Mono',Consolas,monospace;font-size:11px;color:var(--dim);white-space:nowrap}
+.demo-speed input[type=range]{width:80px;accent-color:var(--blue);cursor:pointer}
 
 @media(max-width:700px){
   .hero{padding:60px 16px 40px}
@@ -464,6 +466,7 @@ details summary::-webkit-details-marker{display:none}
       </div>
       <div class="demo-footer">
         <span>Same price-time priority matching logic, running live in your browser</span>
+        <div class="demo-speed"><label>Speed</label><input type="range" id="demoSpeed" min="5" max="100" value="20" oninput="window._setDemoSpeed(+this.value)"><span id="demoSpeedVal">20%</span></div>
         <a href="report.html">Open Full Dashboard &rarr;</a>
       </div>
     </div>
@@ -929,7 +932,11 @@ function render(){
 }
 
 init();
-setInterval(function(){step();step();render();},70);
+var demoTimer=null,demoSpd=20;
+function tick(){step();render();}
+function startTimer(){if(demoTimer)clearInterval(demoTimer);var ms=Math.round(60+(100-demoSpd)*4.4);demoTimer=setInterval(tick,ms);}
+window._setDemoSpeed=function(v){demoSpd=v;document.getElementById('demoSpeedVal').textContent=v+'%';startTimer();};
+startTimer();
 })();
 </script>
 </body>
