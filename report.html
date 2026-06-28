@@ -44,7 +44,7 @@ td{padding:5px 8px;border-bottom:1px solid #21262d}.rt{text-align:right}
 .price-col{width:50px;text-align:center;color:var(--dim);font-size:11px}.price-col.bb{color:var(--green);font-weight:700}.price-col.ba{color:var(--red);font-weight:700}
 .bar-cell{width:80px;display:flex;align-items:center}.bar-cell.bid{justify-content:flex-end}
 .tape{font-family:'SF Mono',Consolas,monospace;font-size:11px;max-height:220px;overflow-y:auto}
-.trade-row{padding:1px 0;opacity:0;animation:fadeIn .2s forwards}
+.trade-row{padding:1px 0;opacity:0;animation:fadeIn .15s forwards}
 @keyframes fadeIn{to{opacity:1}}.trade-buy{color:var(--green)}.trade-sell{color:var(--red)}
 .live-m{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:6px;margin-bottom:10px}
 .live-m .lm{background:var(--card2);border-radius:6px;padding:8px;text-align:center}
@@ -1437,18 +1437,31 @@ const bw=Math.round(bq/mq*100),aw=Math.round(aq/mq*100);const pc=p==bb?'price-co
 h+='<div class="lrow"><div class="bar-cell bid"><div class="bid-bar" style="width:'+bw+'%"></div></div><div class="bid-qty">'+(bq||'')+'</div><div class="'+pc+'">'+p+'</div><div class="ask-qty">'+(aq||'')+'</div><div class="bar-cell"><div class="ask-bar" style="width:'+aw+'%"></div></div></div>';}
 el.innerHTML=h;}
 
-function renderSolo(){
-renderLadder(simBook,simMid,document.getElementById('ladder'));
-if(simBook.trades.length!==lastTapeLen){
-var tapeEl=document.getElementById('tape'),newCount=simBook.trades.length-lastTapeLen;
-lastTapeLen=simBook.trades.length;
-if(newCount<0||newCount>100){tapeEl.innerHTML='';newCount=Math.min(simBook.trades.length,14);}
-var fresh=simBook.trades.slice(-newCount);
-for(var ti=fresh.length-1;ti>=0;ti--){var t=fresh[ti];var d=document.createElement('div');
+// Trade tape: throttled + batch-capped so the stream stays human-readable even when the
+// engine fills thousands of trades/sec. New rows are prepended (existing rows keep their
+// finished fade-in instead of restarting every frame); the window holds the most recent
+// TAPE_MAX trades. The true total is shown separately in the "Trades" stat.
+var TAPE_MAX=14,TAPE_MS=90,TAPE_BATCH=5,lastTapeAt=0;
+function renderTape(){
+var n=simBook.trades.length;
+if(n===lastTapeLen)return;            // no new trades (e.g. paused) — let rows finish fading
+var tapeEl=document.getElementById('tape');
+if(n<lastTapeLen){tapeEl.innerHTML='';lastTapeLen=0;}  // book was reset
+var now=performance.now();
+if(now-lastTapeAt<TAPE_MS)return;     // throttle DOM churn to a readable cadence
+lastTapeAt=now;
+var show=Math.min(n-lastTapeLen,TAPE_BATCH);  // cap rows added per tick so the window persists
+var fresh=simBook.trades.slice(n-show);
+lastTapeLen=n;
+for(var i=0;i<fresh.length;i++){var t=fresh[i];var d=document.createElement('div');
 d.className='trade-row '+(t.side==='buy'?'trade-buy':'trade-sell');
 d.textContent=(t.side==='buy'?'BUY ':'SELL')+' '+t.qty+' @ '+t.price;
 tapeEl.insertBefore(d,tapeEl.firstChild);}
-while(tapeEl.children.length>14)tapeEl.removeChild(tapeEl.lastChild);}
+while(tapeEl.children.length>TAPE_MAX)tapeEl.removeChild(tapeEl.lastChild);}
+
+function renderSolo(){
+renderLadder(simBook,simMid,document.getElementById('ladder'));
+renderTape();
 const spr=(simBook.bestBid()!==null&&simBook.bestAsk()!==null)?simBook.bestAsk()-simBook.bestBid():'--';
 let st='Orders: <b>'+simBook.orderCount()+'</b><br>Trades: <b>'+simBook.mc+'</b><br>Spread: <b>'+spr+'</b><br>Ops: <b>'+opsT.toLocaleString()+'</b>';
 if(cryptoFeed&&cryptoFeed.connected)st+='<br><span style="color:var(--green)">&#9679; LIVE</span> <span style="color:var(--dim)">'+cryptoFeed.pair+'</span>';
