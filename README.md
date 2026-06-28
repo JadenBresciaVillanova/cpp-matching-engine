@@ -276,4 +276,4 @@ hardware provisioning, TSC verification, and cost breakdown.
 
 ---
 
-Built by [Jaden Brescia](https://github.com/JadenBresciaVillanova)
+Built by [Jaden Brescia](https://github.com/JadenBresciaVillanova) · Built with [Claude](https://claude.ai)
