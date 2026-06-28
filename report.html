@@ -341,7 +341,7 @@ td{padding:5px 8px;border-bottom:1px solid #21262d}.rt{text-align:right}
 <option value="1m">1 min</option><option value="5m">5 min</option><option value="15m">15 min</option>
 <option value="1h">1 hour</option><option value="4h">4 hours</option><option value="1d">1 day</option>
 </select></div>
-<div class="sg" id="deDateWrap"><label>Date</label><input type="date" id="deDate" value="2024-01-02" style="background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px"></div>
+<div class="sg" id="deDateWrap"><label>Date <span class="info">i<span class="tip"><b>Sample dataset date</b>The bundled LOBSTER sample data covers a single trading day (2024-01-02) for all nine symbols. Swap in your own LOBSTER message files under <code>data/lobster/</code> to add more dates.</span></span></label><select id="deDate"><option value="2024-01-02">2024-01-02</option></select></div>
 <button onclick="deFetch()" style="background:var(--green);color:#000;border:none;border-radius:6px;padding:6px 16px;cursor:pointer;font-weight:600;font-size:12px">Load Data</button>
 <span id="deStatus" style="color:var(--dim);font-size:11px"></span>
 </div>
@@ -1893,17 +1893,16 @@ async function deFetchLobster(){
 async function deFetchBinance(){
   const pair=document.getElementById('deCryptoPair').value;
   const interval=document.getElementById('deInterval').value;
-  const url='https://api.binance.com/api/v3/klines?symbol='+pair+'&interval='+interval+'&limit=500';
-  let data;
-  try{const resp=await fetch(url);if(resp.ok)data=await resp.json();}catch(e){}
-  if(!data){
-    try{
-      const resp2=await fetch('https://api.allorigins.win/get?url='+encodeURIComponent(url));
-      if(resp2.ok){const wrap=await resp2.json();data=JSON.parse(wrap.contents);}
-    }catch(e){}
+  const path='/api/v3/klines?symbol='+pair+'&interval='+interval+'&limit=500';
+  // api.binance.com is geo-blocked (HTTP 451) in the US and some regions; api.binance.us
+  // serves those clients. Try the global endpoint first, then fall back to the US one.
+  // Both send permissive CORS headers, so a direct browser fetch works wherever they're reachable.
+  let data=null;
+  for(const host of['https://api.binance.com','https://api.binance.us']){
+    try{const resp=await fetch(host+path);if(resp.ok){const j=await resp.json();if(Array.isArray(j)){data=j;break;}}}catch(e){}
   }
   if(!data||!Array.isArray(data)){
-    document.getElementById('deStatus').innerHTML='<span style="color:var(--red)">CORS blocked.</span> <span style="color:var(--dim)">Serve via HTTP: <code style="color:var(--green)">python -m http.server</code> then open localhost:8000</span>';
+    document.getElementById('deStatus').innerHTML='<span style="color:var(--red)">Couldn&rsquo;t reach Binance.</span> <span style="color:var(--dim)">Both the global (<code>api.binance.com</code>, often HTTP&nbsp;451) and US (<code>api.binance.us</code>) REST endpoints were unreachable. Use the <b>LOBSTER</b> source for offline sample data.</span>';
     return;
   }
   try{
@@ -2064,8 +2063,6 @@ function deRenderTable(){
 // ========= ANIMATION =========
 function animate(){if(simOn){soloStep();sampleAnalytics();}renderSolo();if(mOn){multiStep();renderMulti();}if(prOn){pnlRaceStep();renderPnlRace();}stepFeeds();renderExplorer();renderLiveFeeds();renderAnalytics();requestAnimationFrame(animate);}
 animate();buildFeedGrid();
-// Set Data Explorer date to yesterday for relevant Binance data
-(function(){const d=new Date();d.setDate(d.getDate()-1);const ds=d.toISOString().slice(0,10);const el=document.getElementById('deDate');if(el)el.value=ds;})();
 // Auto-select tab from sessionStorage (set by index.html) or URL hash
 (function(){
   var t=sessionStorage.getItem('lob_tab');
